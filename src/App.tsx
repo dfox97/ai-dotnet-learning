@@ -34,6 +34,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import DecisionLab from './DecisionLab';
+import PatternBridgeView from './PatternBridgeView';
+import TranslationReviewView from './TranslationReviewView';
 import ResourcesView from './ResourcesView';
 import { glossary, lessons, type Finding, type Lesson } from './content';
 
@@ -49,7 +51,7 @@ type Progress = {
   reviews: Record<string, ReviewState>;
 };
 
-type Page = 'dashboard' | 'lesson' | 'glossary' | 'resources';
+type Page = 'dashboard' | 'lesson' | 'glossary' | 'resources' | 'bridge' | 'translation';
 
 const emptyReview: ReviewState = {
   selected: [],
@@ -64,7 +66,7 @@ const defaultProgress: Progress = {
 };
 
 const iconForLesson = [Braces, TerminalSquare, Gauge, ServerCog, Database, Box, Blocks, ShieldCheck, Bot];
-const csharpHighlighter = import('./syntax').then((module) => module.csharpHighlighter);
+const codeHighlighter = import('./syntax').then((module) => module.codeHighlighter);
 
 function loadProgress(): Progress {
   try {
@@ -154,6 +156,7 @@ function App() {
             percent={percent}
             nextLesson={nextLesson}
             onOpenLesson={openLesson}
+            onNavigate={openPage}
           />
         )}
         {page === 'lesson' && (
@@ -168,6 +171,8 @@ function App() {
         )}
         {page === 'glossary' && <Glossary onOpenLesson={openLesson} />}
         {page === 'resources' && <ResourcesView />}
+        {page === 'bridge' && <PatternBridgeView />}
+        {page === 'translation' && <TranslationReviewView />}
       </main>
     </div>
   );
@@ -203,6 +208,13 @@ function Sidebar({ page, percent, open, onClose, onNavigate, onReset }: SidebarP
           </button>
           <button className={page === 'lesson' ? 'active' : ''} onClick={() => onNavigate('lesson')}>
             <GitPullRequest size={18} /> Review labs
+          </button>
+          <p className="nav-group-label">Practice</p>
+          <button className={page === 'bridge' ? 'active' : ''} onClick={() => onNavigate('bridge')}>
+            <Blocks size={18} /> Pattern bridge
+          </button>
+          <button className={page === 'translation' ? 'active' : ''} onClick={() => onNavigate('translation')}>
+            <Bot size={18} /> Translation review
           </button>
           <button className={page === 'glossary' ? 'active' : ''} onClick={() => onNavigate('glossary')}>
             <BookOpen size={18} /> .NET glossary
@@ -248,9 +260,10 @@ type DashboardProps = {
   percent: number;
   nextLesson: Lesson;
   onOpenLesson: (id: string) => void;
+  onNavigate: (page: Page) => void;
 };
 
-function Dashboard({ progress, percent, nextLesson, onOpenLesson }: DashboardProps) {
+function Dashboard({ progress, percent, nextLesson, onOpenLesson, onNavigate }: DashboardProps) {
   const reviewedCount = Object.values(progress.reviews).filter((review) => review.submitted).length;
 
   return (
@@ -296,6 +309,19 @@ function Dashboard({ progress, percent, nextLesson, onOpenLesson }: DashboardPro
             <div><strong>{lessons.length - progress.completed.length}</strong><span>Modules left</span></div>
           </div>
         </article>
+      </section>
+
+      <section className="practice-strip">
+        <button onClick={() => onNavigate('bridge')}>
+          <div className="practice-icon bridge"><Blocks size={21} /></div>
+          <span><small>INTERACTIVE LAB 01</small><strong>Pattern bridge</strong><p>Connect Angular and NestJS patterns to idiomatic .NET side by side.</p></span>
+          <ArrowRight size={18} />
+        </button>
+        <button onClick={() => onNavigate('translation')}>
+          <div className="practice-icon translation"><Bot size={21} /></div>
+          <span><small>INTERACTIVE LAB 02</small><strong>Translation review</strong><p>Audit plausible AI-generated C# against working TypeScript intent.</p></span>
+          <ArrowRight size={18} />
+        </button>
       </section>
 
       <section className="section-block">
@@ -364,7 +390,7 @@ function LessonView({ lesson, progress, onBack, onOpenLesson, onUpdateReview, on
     let active = true;
     setHighlightedLines([]);
 
-    void csharpHighlighter.then((highlighter) => {
+    void codeHighlighter.then((highlighter) => {
       const result = highlighter.codeToTokens(lesson.code, { lang: 'csharp', theme: 'github-dark' });
       if (active) setHighlightedLines(result.tokens);
     });
