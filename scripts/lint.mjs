@@ -1,7 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const sourceRoot = new URL('../src/', import.meta.url);
+const sourceRoot = fileURLToPath(new URL('../src/', import.meta.url));
 const allowedExtensions = new Set(['.ts', '.tsx', '.css']);
 const failures = [];
 
