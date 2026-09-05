@@ -1,0 +1,27 @@
+name: Bootstrap ESLint
+
+on:
+  push:
+    branches: [codex/2-quality-harness]
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    if: ${{ !contains(github.event.head_commit.message, 'chore: install eslint dependencies') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Install pinned ESLint dependencies
+        run: npm install --save-dev --save-exact eslint @eslint/js typescript-eslint globals --registry=https://registry.npmjs.org/
+      - name: Commit dependency metadata
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          git commit -m 'chore: install eslint dependencies'
+          git push
