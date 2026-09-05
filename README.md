@@ -11,13 +11,29 @@ npm ci
 npm run dev
 ```
 
-## Checks
+## Quality checks
+
+Run the same checks used by CI before opening a pull request:
 
 ```bash
+npm run lint
+npm run typecheck
+npm test
 npm run build
 ```
 
+- `npm run lint` runs ESLint across the TypeScript source and test files.
+- `npm run typecheck` validates the TypeScript project without emitting output.
+- `npm test` runs the baseline learner-visible behaviour tests with Node's built-in test runner.
+- `npm run build` produces the production Vite build.
+
 This repository is currently a personal alpha. See the GitHub roadmap for the planned learner journey, diagnostics, and capstone.
+
+## Contributing
+
+Create a focused branch, make the smallest coherent change, run the full quality checks above, and open a pull request describing the behaviour changed and how it was verified.
+
+When real C# projects are introduced, .NET analyzers/formatting should be configured alongside the JavaScript/TypeScript ESLint checks rather than attempting to lint C# through ESLint.
 
 ## Licensing
 
