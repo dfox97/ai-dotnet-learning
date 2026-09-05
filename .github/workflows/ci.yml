@@ -13,13 +13,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - name: Generate pinned ESLint dependency metadata
-        run: npm install --save-dev --save-exact eslint @eslint/js typescript-eslint globals --registry=https://registry.npmjs.org/
-      - name: Emit generated dependency metadata
-        run: |
-          echo '---PACKAGE_JSON---'
-          cat package.json
-          echo '---PACKAGE_LOCK_BASE64---'
-          base64 -w0 package-lock.json
-          echo
-          echo '---END_PACKAGE_LOCK_BASE64---'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
