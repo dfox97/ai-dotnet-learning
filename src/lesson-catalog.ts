@@ -1,9 +1,9 @@
-import { lessons as legacyLessons, type Lesson } from './content';
+import { lessons as legacyLessons, type Lesson } from './content.ts';
 import {
   type LessonContentContract,
   validateLessonCollection,
   validateLessonContent,
-} from './content-contract';
+} from './content-contract.ts';
 
 function migrateFirstLesson(lesson: Lesson): LessonContentContract {
   const conceptIds = lesson.concepts.map((_, index) => `${lesson.id}-concept-${index + 1}`);
