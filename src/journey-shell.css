@@ -1,0 +1,19 @@
+.journey-launchpad-host {
+  position: relative;
+  z-index: 2;
+  margin-left: 272px;
+  padding: 20px 24px 0;
+  background: var(--surface, #fff);
+}
+
+.journey-launchpad-host .page {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+  .journey-launchpad-host {
+    margin-left: 0;
+    padding: 72px 16px 0;
+  }
+}
