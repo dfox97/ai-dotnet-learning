@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import DecisionLab from './DecisionLab';
 import PatternBridgeView from './PatternBridgeView';
+import ProgressTransferControls from './ProgressTransferControls';
 import TranslationReviewView from './TranslationReviewView';
 import ResourcesView from './ResourcesView';
 import { glossary, lessons, type Finding, type Lesson } from './content';
@@ -210,6 +211,11 @@ function App() {
     setProgress((current) => markLessonCompleted(current, lessonId));
   };
 
+  const replaceProgress = (replacement: LearnerProgress) => {
+    setProgress(replacement);
+    setProgressRecoveryReason(null);
+  };
+
   const acceptCleanProgress = () => {
     resetLearnerProgress(localStorage);
     setProgress(createEmptyProgress());
@@ -233,9 +239,11 @@ function App() {
       <Sidebar
         page={page}
         percent={percent}
+        progress={progress}
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
         onNavigate={openPage}
+        onReplaceProgress={replaceProgress}
         onReset={resetProgress}
       />
 
@@ -301,13 +309,15 @@ function App() {
 type SidebarProps = {
   page: Page;
   percent: number;
+  progress: LearnerProgress;
   open: boolean;
   onClose: () => void;
   onNavigate: (page: Page) => void;
+  onReplaceProgress: (progress: LearnerProgress) => void;
   onReset: () => void;
 };
 
-function Sidebar({ page, percent, open, onClose, onNavigate, onReset }: SidebarProps) {
+function Sidebar({ page, percent, progress, open, onClose, onNavigate, onReplaceProgress, onReset }: SidebarProps) {
   return (
     <>
       {open && <button className="nav-scrim" aria-label="Close navigation" onClick={onClose} />}
@@ -354,6 +364,7 @@ function Sidebar({ page, percent, open, onClose, onNavigate, onReset }: SidebarP
           <p>{percent === 100 ? 'Track complete. Revisit any review.' : 'Every review is saved locally.'}</p>
         </div>
 
+        <ProgressTransferControls progress={progress} onReplace={onReplaceProgress} />
         <button className="reset-button" onClick={onReset}><RotateCcw size={15} /> Reset progress</button>
 
         <div className="profile-card">
