@@ -29,10 +29,51 @@ test('migrates the existing lesson-only progress without losing learner data', (
   assert.equal(result.progress.version, PROGRESS_VERSION);
 });
 
-test('round-trips a valid versioned progress document', () => {
+test('migrates the previous versioned progress format into the complete schema', () => {
+  const previous = JSON.stringify({
+    version: 1,
+    lessons: {
+      completed: ['compiler-nullability'],
+      reviews: {},
+    },
+    practice: {},
+    diagnostics: {},
+    recommendations: {},
+    reflections: { 'compiler-nullability': 'Keep nullability enabled.' },
+    capstone: {},
+  });
+
+  const result = parseProgress(previous);
+  assert.equal(result.status, 'migrated');
+  assert.equal(result.progress.version, PROGRESS_VERSION);
+  assert.deepEqual(result.progress.lessons.completed, ['compiler-nullability']);
+  assert.equal(result.progress.reflections['compiler-nullability'], 'Keep nullability enabled.');
+  assert.deepEqual(result.progress.practice.patternBridge, {});
+  assert.equal(result.progress.diagnostics.baseline.status, 'not-started');
+  assert.equal(result.progress.capstone.stage, 'not-started');
+});
+
+test('round-trips complete learner journey state', () => {
   const progress = createEmptyProgress();
   progress.lessons.completed.push('compiler-nullability');
   progress.reflections['compiler-nullability'] = 'Nullable flow analysis is clearer now.';
+  progress.practice.patternBridge['di-lifetimes'] = {
+    status: 'completed',
+    startedAt: '2026-09-06T09:00:00.000Z',
+    completedAt: '2026-09-06T09:10:00.000Z',
+    attempts: 1,
+  };
+  progress.diagnostics.baseline = {
+    assessmentId: 'baseline-a',
+    assessmentVersion: 1,
+    status: 'completed',
+    responses: { cancellation: 'blocker' },
+    competencyScores: { cancellation: 1 },
+    criticalRisks: [],
+  };
+  progress.recommendations.activityIds = ['compiler-nullability'];
+  progress.capstone.stage = 'review';
+  progress.capstone.version = 1;
 
   const result = parseProgress(serializeProgress(progress));
   assert.equal(result.status, 'loaded');
