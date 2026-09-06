@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeftRight, ArrowRight, CheckCircle2, Layers3, Link2 } from 'lucide-react';
 import { bridgePatterns } from './practice-catalog';
+import { ensurePracticeStarted, recordPracticeCompleted } from './practice-progress';
 import SyntaxPanel from './SyntaxPanel';
 
 type PatternBridgeViewProps = {
@@ -12,9 +13,14 @@ export default function PatternBridgeView({ initialPatternId, onPatternChange }:
   const initialPattern = bridgePatterns.find((item) => item.id === initialPatternId) ?? bridgePatterns[0];
   const [patternId, setPatternId] = useState(initialPattern.id);
   const [conceptId, setConceptId] = useState(initialPattern.concepts[0].id);
+  const [completedPatternIds, setCompletedPatternIds] = useState<Set<string>>(new Set());
   const pattern = bridgePatterns.find((item) => item.id === patternId) ?? bridgePatterns[0];
   const concept = pattern.concepts.find((item) => item.id === conceptId) ?? pattern.concepts[0];
   const patternIndex = bridgePatterns.findIndex((item) => item.id === pattern.id);
+
+  useEffect(() => {
+    ensurePracticeStarted('patternBridge', pattern.id);
+  }, [pattern.id]);
 
   const selectPattern = (nextPatternId: string) => {
     const nextPattern = bridgePatterns.find((item) => item.id === nextPatternId);
@@ -23,6 +29,11 @@ export default function PatternBridgeView({ initialPatternId, onPatternChange }:
     setConceptId(nextPattern.concepts[0].id);
     onPatternChange?.(nextPattern.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const markComplete = () => {
+    recordPracticeCompleted('patternBridge', pattern.id);
+    setCompletedPatternIds((current) => new Set(current).add(pattern.id));
   };
 
   return (
@@ -47,7 +58,7 @@ export default function PatternBridgeView({ initialPatternId, onPatternChange }:
           <button className={item.id === pattern.id ? 'active' : ''} key={item.id} onClick={() => selectPattern(item.id)}>
             <span>{String(index + 1).padStart(2, '0')}</span>
             <div><small>{item.category}</small><strong>{item.title}</strong></div>
-            {item.id === pattern.id ? <CheckCircle2 size={17} /> : <ArrowRight size={15} />}
+            {completedPatternIds.has(item.id) || item.id === pattern.id ? <CheckCircle2 size={17} /> : <ArrowRight size={15} />}
           </button>
         ))}
       </nav>
@@ -60,34 +71,16 @@ export default function PatternBridgeView({ initialPatternId, onPatternChange }:
 
         <div className="concept-tabs" role="tablist" aria-label="Linked concepts">
           {pattern.concepts.map((item) => (
-            <button
-              role="tab"
-              aria-selected={item.id === concept.id}
-              className={item.id === concept.id ? 'active' : ''}
-              key={item.id}
-              onClick={() => setConceptId(item.id)}
-            >
+            <button role="tab" aria-selected={item.id === concept.id} className={item.id === concept.id ? 'active' : ''} key={item.id} onClick={() => setConceptId(item.id)}>
               <Link2 size={13} /> {item.label}
             </button>
           ))}
         </div>
 
         <div className="comparison-grid">
-          <SyntaxPanel
-            label={pattern.typeScript.label}
-            fileName={pattern.typeScript.fileName}
-            code={pattern.typeScript.code}
-            language="typescript"
-            highlightedLines={concept.typeScriptLines}
-          />
+          <SyntaxPanel label={pattern.typeScript.label} fileName={pattern.typeScript.fileName} code={pattern.typeScript.code} language="typescript" highlightedLines={concept.typeScriptLines} />
           <div className="comparison-link" aria-hidden="true"><ArrowLeftRight size={17} /></div>
-          <SyntaxPanel
-            label={pattern.csharp.label}
-            fileName={pattern.csharp.fileName}
-            code={pattern.csharp.code}
-            language="csharp"
-            highlightedLines={concept.csharpLines}
-          />
+          <SyntaxPanel label={pattern.csharp.label} fileName={pattern.csharp.fileName} code={pattern.csharp.code} language="csharp" highlightedLines={concept.csharpLines} />
         </div>
 
         <div className="concept-explanation">
@@ -99,7 +92,10 @@ export default function PatternBridgeView({ initialPatternId, onPatternChange }:
 
       <footer className="pattern-next">
         <div><span>{String(patternIndex + 1).padStart(2, '0')}</span><p><strong>{pattern.category}</strong> comparison complete when you can explain every linked concept without relying on syntax.</p></div>
-        {patternIndex < bridgePatterns.length - 1 && <button className="primary-button" onClick={() => selectPattern(bridgePatterns[patternIndex + 1].id)}>Next pattern <ArrowRight size={16} /></button>}
+        <div>
+          <button className="secondary-button" onClick={markComplete} disabled={completedPatternIds.has(pattern.id)}>{completedPatternIds.has(pattern.id) ? 'Comparison complete' : 'Mark comparison complete'}</button>
+          {patternIndex < bridgePatterns.length - 1 && <button className="primary-button" onClick={() => selectPattern(bridgePatterns[patternIndex + 1].id)}>Next pattern <ArrowRight size={16} /></button>}
+        </div>
       </footer>
     </div>
   );

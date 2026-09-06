@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, Check, Compass, RotateCcw, X } from 'lucide-react';
 import type { DecisionLab as DecisionLabContent } from './content';
+import { ensurePracticeStarted, recordPracticeCompleted } from './practice-progress';
 
 type DecisionLabProps = {
   lab: DecisionLabContent;
@@ -9,12 +10,19 @@ type DecisionLabProps = {
 
 export default function DecisionLab({ lab, lessonId }: DecisionLabProps) {
   const [selected, setSelected] = useState<number | null>(null);
+  const activityId = `${lessonId}-decision`;
 
   useEffect(() => {
     setSelected(null);
-  }, [lessonId]);
+    ensurePracticeStarted('decisionLabs', activityId);
+  }, [activityId, lessonId]);
 
   const selectedOption = selected === null ? null : lab.options[selected];
+
+  const selectOption = (index: number) => {
+    setSelected(index);
+    if (lab.options[index]?.correct) recordPracticeCompleted('decisionLabs', activityId);
+  };
 
   return (
     <section className="decision-section">
@@ -41,11 +49,7 @@ export default function DecisionLab({ lab, lessonId }: DecisionLabProps) {
             const revealed = selected !== null;
             const state = revealed && option.correct ? 'correct' : revealed && chosen ? 'wrong' : '';
             return (
-              <button
-                key={option.label}
-                className={`${chosen ? 'chosen' : ''} ${state}`}
-                onClick={() => setSelected(index)}
-              >
+              <button key={option.label} className={`${chosen ? 'chosen' : ''} ${state}`} onClick={() => selectOption(index)}>
                 <span className="decision-choice">
                   {revealed && option.correct ? <Check size={15} /> : revealed && chosen ? <X size={15} /> : String.fromCharCode(65 + index)}
                 </span>
