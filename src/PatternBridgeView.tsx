@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeftRight, ArrowRight, CheckCircle2, Layers3, Link2 } from 'lucide-react';
-import { bridgePatterns } from './patterns';
+import { bridgePatterns } from './practice-catalog';
 import SyntaxPanel from './SyntaxPanel';
 
 type PatternBridgeViewProps = {
