@@ -15,8 +15,14 @@ const emptyChallenge: ChallengeState = {
   solutionRevealed: false,
 };
 
-export default function TranslationReviewView() {
-  const [challengeId, setChallengeId] = useState(translationChallenges[0].id);
+type TranslationReviewViewProps = {
+  initialChallengeId?: string;
+  onChallengeChange?: (challengeId: string) => void;
+};
+
+export default function TranslationReviewView({ initialChallengeId, onChallengeChange }: TranslationReviewViewProps) {
+  const initialChallenge = translationChallenges.find((item) => item.id === initialChallengeId) ?? translationChallenges[0];
+  const [challengeId, setChallengeId] = useState(initialChallenge.id);
   const [challengeStates, setChallengeStates] = useState<Record<string, ChallengeState>>({});
   const challenge = translationChallenges.find((item) => item.id === challengeId) ?? translationChallenges[0];
   const review = challengeStates[challenge.id] ?? emptyChallenge;
@@ -27,6 +33,7 @@ export default function TranslationReviewView() {
 
   const selectChallenge = (id: string) => {
     setChallengeId(id);
+    onChallengeChange?.(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
