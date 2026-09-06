@@ -38,6 +38,12 @@ import PatternBridgeView from './PatternBridgeView';
 import TranslationReviewView from './TranslationReviewView';
 import ResourcesView from './ResourcesView';
 import { glossary, lessons, type Finding, type Lesson } from './content';
+import { bridgePatterns, translationChallenges } from './patterns';
+import {
+  createWindowNavigationHistory,
+  navigateToLearningLocation,
+  resolveBrowserLocation,
+} from './browser-navigation';
 
 type ReviewState = {
   selected: number[];
@@ -53,6 +59,13 @@ type Progress = {
 
 type Page = 'dashboard' | 'lesson' | 'glossary' | 'resources' | 'bridge' | 'translation';
 
+type AppLocationState = {
+  page: Page;
+  activeLessonId: string;
+  practiceId: string | null;
+  recoveredFrom: string | null;
+};
+
 const emptyReview: ReviewState = {
   selected: [],
   note: '',
@@ -63,6 +76,16 @@ const emptyReview: ReviewState = {
 const defaultProgress: Progress = {
   completed: [],
   reviews: {},
+};
+
+const lessonIds = new Set(lessons.map((lesson) => lesson.id));
+const bridgePatternIds = new Set(bridgePatterns.map((pattern) => pattern.id));
+const translationChallengeIds = new Set(translationChallenges.map((challenge) => challenge.id));
+const practiceIds = new Set([...bridgePatternIds, ...translationChallengeIds]);
+const knownLearningIds = {
+  lessonIds,
+  diagnosticIds: new Set<string>(),
+  practiceIds,
 };
 
 const iconForLesson = [Braces, TerminalSquare, Gauge, ServerCog, Database, Box, Blocks, ShieldCheck, Bot];
@@ -83,6 +106,35 @@ function loadProgress(): Progress {
   }
 }
 
+function resolveAppPath(pathname: string): AppLocationState {
+  if (pathname === '/glossary') {
+    return { page: 'glossary', activeLessonId: lessons[0].id, practiceId: null, recoveredFrom: null };
+  }
+  if (pathname === '/resources') {
+    return { page: 'resources', activeLessonId: lessons[0].id, practiceId: null, recoveredFrom: null };
+  }
+
+  const resolved = resolveBrowserLocation(pathname, knownLearningIds);
+  const { location } = resolved;
+
+  if (location.kind === 'dashboard') {
+    return { page: 'dashboard', activeLessonId: lessons[0].id, practiceId: null, recoveredFrom: resolved.recoveredFrom };
+  }
+  if (location.kind === 'lesson') {
+    return { page: 'lesson', activeLessonId: location.lessonId, practiceId: null, recoveredFrom: null };
+  }
+  if (location.kind === 'practice') {
+    if (bridgePatternIds.has(location.activityId)) {
+      return { page: 'bridge', activeLessonId: lessons[0].id, practiceId: location.activityId, recoveredFrom: null };
+    }
+    if (translationChallengeIds.has(location.activityId)) {
+      return { page: 'translation', activeLessonId: lessons[0].id, practiceId: location.activityId, recoveredFrom: null };
+    }
+  }
+
+  return { page: 'dashboard', activeLessonId: lessons[0].id, practiceId: null, recoveredFrom: pathname };
+}
+
 function severityLabel(severity: Finding['severity']) {
   if (severity === 'blocker') return 'Must fix';
   if (severity === 'warning') return 'Should fix';
@@ -90,8 +142,12 @@ function severityLabel(severity: Finding['severity']) {
 }
 
 function App() {
-  const [page, setPage] = useState<Page>('dashboard');
-  const [activeLessonId, setActiveLessonId] = useState(lessons[0].id);
+  const navigationHistory = useMemo(() => createWindowNavigationHistory(window), []);
+  const initialNavigation = useMemo(() => resolveAppPath(navigationHistory.pathname), [navigationHistory]);
+  const [page, setPage] = useState<Page>(initialNavigation.page);
+  const [activeLessonId, setActiveLessonId] = useState(initialNavigation.activeLessonId);
+  const [practiceId, setPracticeId] = useState<string | null>(initialNavigation.practiceId);
+  const [recoveredFrom, setRecoveredFrom] = useState<string | null>(initialNavigation.recoveredFrom);
   const [progress, setProgress] = useState<Progress>(loadProgress);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -99,18 +155,66 @@ function App() {
     localStorage.setItem('reviewlab-progress', JSON.stringify(progress));
   }, [progress]);
 
+  useEffect(() => {
+    if (initialNavigation.recoveredFrom) navigationHistory.replace('/');
+
+    return navigationHistory.subscribe((pathname) => {
+      const next = resolveAppPath(pathname);
+      setPage(next.page);
+      setActiveLessonId(next.activeLessonId);
+      setPracticeId(next.practiceId);
+      setRecoveredFrom(next.recoveredFrom);
+      setMobileNavOpen(false);
+      if (next.recoveredFrom) navigationHistory.replace('/');
+      window.scrollTo({ top: 0 });
+    });
+  }, [initialNavigation.recoveredFrom, navigationHistory]);
+
   const activeLesson = lessons.find((lesson) => lesson.id === activeLessonId) ?? lessons[0];
-  const nextLesson = lessons.find((lesson) => !progress.completed.includes(lesson.id)) ?? lessons[lessons.length - 1];
+  const nextLesson = lessons.find((lesson) => !progress.completed.includes(lesson.id)) ?? null;
   const percent = Math.round((progress.completed.length / lessons.length) * 100);
 
   const openLesson = (lessonId: string) => {
+    navigateToLearningLocation(navigationHistory, { kind: 'lesson', lessonId });
     setActiveLessonId(lessonId);
+    setPracticeId(null);
+    setRecoveredFrom(null);
     setPage('lesson');
     setMobileNavOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const openPractice = (target: 'bridge' | 'translation', activityId: string) => {
+    navigateToLearningLocation(navigationHistory, { kind: 'practice', activityId });
+    setPracticeId(activityId);
+    setRecoveredFrom(null);
+    setPage(target);
+    setMobileNavOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const openPage = (target: Page) => {
+    if (target === 'dashboard') {
+      navigateToLearningLocation(navigationHistory, { kind: 'dashboard' });
+      setPracticeId(null);
+    } else if (target === 'lesson') {
+      navigateToLearningLocation(navigationHistory, { kind: 'lesson', lessonId: activeLessonId });
+      setPracticeId(null);
+    } else if (target === 'bridge') {
+      openPractice('bridge', bridgePatternIds.has(practiceId ?? '') ? practiceId! : bridgePatterns[0].id);
+      return;
+    } else if (target === 'translation') {
+      openPractice('translation', translationChallengeIds.has(practiceId ?? '') ? practiceId! : translationChallenges[0].id);
+      return;
+    } else if (target === 'glossary') {
+      navigationHistory.push('/glossary');
+      setPracticeId(null);
+    } else if (target === 'resources') {
+      navigationHistory.push('/resources');
+      setPracticeId(null);
+    }
+
+    setRecoveredFrom(null);
     setPage(target);
     setMobileNavOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -134,7 +238,10 @@ function App() {
     const confirmed = window.confirm('Reset all completed lessons and review notes?');
     if (!confirmed) return;
     setProgress(defaultProgress);
+    setPracticeId(null);
+    setRecoveredFrom(null);
     setPage('dashboard');
+    navigationHistory.replace('/');
   };
 
   return (
@@ -150,6 +257,14 @@ function App() {
 
       <main className="main-content">
         <MobileHeader onMenu={() => setMobileNavOpen(true)} />
+        {recoveredFrom && (
+          <section className="empty-state" role="status">
+            <XCircle size={26} />
+            <h2>That learning link is no longer available.</h2>
+            <p>ReviewLab returned you to the dashboard from <code>{recoveredFrom}</code>.</p>
+            <button className="secondary-button" onClick={() => setRecoveredFrom(null)}>Dismiss</button>
+          </section>
+        )}
         {page === 'dashboard' && (
           <Dashboard
             progress={progress}
@@ -171,8 +286,20 @@ function App() {
         )}
         {page === 'glossary' && <Glossary onOpenLesson={openLesson} />}
         {page === 'resources' && <ResourcesView />}
-        {page === 'bridge' && <PatternBridgeView />}
-        {page === 'translation' && <TranslationReviewView />}
+        {page === 'bridge' && (
+          <PatternBridgeView
+            key={`bridge-${practiceId ?? 'default'}`}
+            initialPatternId={practiceId ?? undefined}
+            onPatternChange={(id) => openPractice('bridge', id)}
+          />
+        )}
+        {page === 'translation' && (
+          <TranslationReviewView
+            key={`translation-${practiceId ?? 'default'}`}
+            initialChallengeId={practiceId ?? undefined}
+            onChallengeChange={(id) => openPractice('translation', id)}
+          />
+        )}
       </main>
     </div>
   );
@@ -258,7 +385,7 @@ function MobileHeader({ onMenu }: { onMenu: () => void }) {
 type DashboardProps = {
   progress: Progress;
   percent: number;
-  nextLesson: Lesson;
+  nextLesson: Lesson | null;
   onOpenLesson: (id: string) => void;
   onNavigate: (page: Page) => void;
 };
@@ -274,19 +401,30 @@ function Dashboard({ progress, percent, nextLesson, onOpenLesson, onNavigate }: 
           <h1>Good morning, reviewer.</h1>
           <p>Turn your TypeScript instincts into production .NET judgment.</p>
         </div>
-        <div className="header-chip"><span className="status-dot" /> Path active</div>
+        <div className="header-chip"><span className="status-dot" /> {nextLesson ? 'Path active' : 'Path complete'}</div>
       </header>
 
       <section className="hero-grid">
         <article className="continue-card">
           <div className="continue-copy">
-            <span className="overline"><Play size={13} fill="currentColor" /> CONTINUE YOUR PATH</span>
-            <p className="lesson-index">MODULE {nextLesson.number} · {nextLesson.duration}</p>
-            <h2>{nextLesson.title}</h2>
-            <p>{nextLesson.summary}</p>
-            <button className="primary-button light" onClick={() => onOpenLesson(nextLesson.id)}>
-              {progress.completed.length === 0 ? 'Start first review' : 'Continue learning'} <ArrowRight size={17} />
-            </button>
+            {nextLesson ? (
+              <>
+                <span className="overline"><Play size={13} fill="currentColor" /> CONTINUE YOUR PATH</span>
+                <p className="lesson-index">MODULE {nextLesson.number} · {nextLesson.duration}</p>
+                <h2>{nextLesson.title}</h2>
+                <p>{nextLesson.summary}</p>
+                <button className="primary-button light" onClick={() => onOpenLesson(nextLesson.id)}>
+                  {progress.completed.length === 0 ? 'Start first review' : 'Continue learning'} <ArrowRight size={17} />
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="overline"><CheckCircle2 size={13} /> PATH COMPLETE</span>
+                <p className="lesson-index">ALL {lessons.length} MODULES COMPLETE</p>
+                <h2>Your review pathway is complete.</h2>
+                <p>Revisit any review or continue into the practice labs to keep strengthening production judgement.</p>
+              </>
+            )}
           </div>
           <div className="hero-visual" aria-hidden="true">
             <div className="orbit orbit-one" />
@@ -335,7 +473,7 @@ function Dashboard({ progress, percent, nextLesson, onOpenLesson, onNavigate }: 
             const LessonIcon = iconForLesson[index];
             const done = progress.completed.includes(lesson.id);
             const review = progress.reviews[lesson.id];
-            const active = !done && lesson.id === nextLesson.id;
+            const active = !done && lesson.id === nextLesson?.id;
             return (
               <button className={`lesson-row ${done ? 'done' : ''} ${active ? 'current' : ''}`} key={lesson.id} onClick={() => onOpenLesson(lesson.id)}>
                 <div className="lesson-status">
