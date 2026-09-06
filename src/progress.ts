@@ -59,21 +59,17 @@ export type LearnerProgress = {
 };
 
 type LegacyProgress = {
-  completed: string[];
-  reviews: Record<string, ReviewState>;
+  completed?: string[];
+  reviews?: Record<string, ReviewState>;
 };
 
 type VersionOneProgress = {
   version: 1;
-  lessons: {
-    completed: string[];
-    reviews: Record<string, ReviewState>;
+  lessons?: {
+    completed?: string[];
+    reviews?: Record<string, ReviewState>;
   };
-  practice: Record<string, unknown>;
-  diagnostics: Record<string, unknown>;
-  recommendations: Record<string, unknown>;
-  reflections: Record<string, string>;
-  capstone: Record<string, unknown>;
+  reflections?: Record<string, string>;
 };
 
 export type ProgressLoadResult =
@@ -111,99 +107,37 @@ export function createEmptyProgress(): LearnerProgress {
   };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+function asStoredObject(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }
 
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+function hydrateProgress(saved: Partial<LearnerProgress>): LearnerProgress {
+  const empty = createEmptyProgress();
+
+  return {
+    ...empty,
+    ...saved,
+    version: PROGRESS_VERSION,
+    lessons: { ...empty.lessons, ...saved.lessons },
+    practice: { ...empty.practice, ...saved.practice },
+    diagnostics: { ...empty.diagnostics, ...saved.diagnostics },
+    recommendations: { ...empty.recommendations, ...saved.recommendations },
+    reflections: saved.reflections ?? empty.reflections,
+    capstone: { ...empty.capstone, ...saved.capstone },
+  };
 }
 
-function isReviewState(value: unknown): value is ReviewState {
-  if (!isRecord(value)) return false;
-  return Array.isArray(value.selected)
-    && value.selected.every((line) => Number.isInteger(line) && line > 0)
-    && typeof value.note === 'string'
-    && typeof value.submitted === 'boolean'
-    && (value.quizAnswer === null || Number.isInteger(value.quizAnswer));
-}
-
-function isReviewMap(value: unknown): value is Record<string, ReviewState> {
-  return isRecord(value) && Object.values(value).every(isReviewState);
-}
-
-function isActivityAttempt(value: unknown): value is ActivityAttempt {
-  if (!isRecord(value)) return false;
-  return ['not-started', 'in-progress', 'completed'].includes(String(value.status))
-    && (value.startedAt === null || typeof value.startedAt === 'string')
-    && (value.completedAt === null || typeof value.completedAt === 'string')
-    && Number.isInteger(value.attempts)
-    && Number(value.attempts) >= 0;
-}
-
-function isActivityMap(value: unknown): value is Record<string, ActivityAttempt> {
-  return isRecord(value) && Object.values(value).every(isActivityAttempt);
-}
-
-function isDiagnosticProgress(value: unknown): value is DiagnosticProgress {
-  if (!isRecord(value)) return false;
-  return (value.assessmentId === null || typeof value.assessmentId === 'string')
-    && (value.assessmentVersion === null || Number.isInteger(value.assessmentVersion))
-    && ['not-started', 'in-progress', 'completed'].includes(String(value.status))
-    && isRecord(value.responses)
-    && Object.values(value.responses).every((response) => response === null || ['string', 'number', 'boolean'].includes(typeof response))
-    && isRecord(value.competencyScores)
-    && Object.values(value.competencyScores).every((score) => typeof score === 'number' && Number.isFinite(score))
-    && isStringArray(value.criticalRisks);
-}
-
-function isVersionOneProgress(value: unknown): value is VersionOneProgress {
-  if (!isRecord(value) || value.version !== 1 || !isRecord(value.lessons)) return false;
-  return isStringArray(value.lessons.completed)
-    && isReviewMap(value.lessons.reviews)
-    && isRecord(value.practice)
-    && isRecord(value.diagnostics)
-    && isRecord(value.recommendations)
-    && isRecord(value.reflections)
-    && Object.values(value.reflections).every((reflection) => typeof reflection === 'string')
-    && isRecord(value.capstone);
-}
-
-function isLegacyProgress(value: unknown): value is LegacyProgress {
-  return isRecord(value)
-    && isStringArray(value.completed)
-    && isReviewMap(value.reviews);
-}
-
-export function isLearnerProgress(value: unknown): value is LearnerProgress {
-  if (!isRecord(value) || value.version !== PROGRESS_VERSION || !isRecord(value.lessons)) return false;
-  if (!isRecord(value.practice) || !isRecord(value.diagnostics) || !isRecord(value.recommendations) || !isRecord(value.capstone)) return false;
-
-  return isStringArray(value.lessons.completed)
-    && isReviewMap(value.lessons.reviews)
-    && isActivityMap(value.practice.patternBridge)
-    && isActivityMap(value.practice.translationReview)
-    && isActivityMap(value.practice.decisionLabs)
-    && isDiagnosticProgress(value.diagnostics.baseline)
-    && isDiagnosticProgress(value.diagnostics.post)
-    && isStringArray(value.recommendations.activityIds)
-    && isStringArray(value.recommendations.masteredCompetencyIds)
-    && isStringArray(value.recommendations.atRiskCompetencyIds)
-    && isRecord(value.reflections)
-    && Object.values(value.reflections).every((reflection) => typeof reflection === 'string')
-    && (value.capstone.version === null || Number.isInteger(value.capstone.version))
-    && ['not-started', 'review', 'repair', 'evidence', 'completed'].includes(String(value.capstone.stage))
-    && isRecord(value.capstone.findings)
-    && Object.values(value.capstone.findings).every((finding) => typeof finding === 'string')
-    && isStringArray(value.capstone.testEvidence)
-    && typeof value.capstone.reflection === 'string';
-}
-
-function migrateLessonData(completed: string[], reviews: Record<string, ReviewState>, reflections: Record<string, string> = {}): LearnerProgress {
+function migrateLessonData(
+  completed: string[] = [],
+  reviews: Record<string, ReviewState> = {},
+  reflections: Record<string, string> = {},
+): LearnerProgress {
   const progress = createEmptyProgress();
-  progress.lessons.completed = [...completed];
-  progress.lessons.reviews = { ...reviews };
-  progress.reflections = { ...reflections };
+  progress.lessons.completed = completed;
+  progress.lessons.reviews = reviews;
+  progress.reflections = reflections;
   return progress;
 }
 
@@ -212,7 +146,11 @@ export function migrateLegacyProgress(legacy: LegacyProgress): LearnerProgress {
 }
 
 export function migrateVersionOneProgress(previous: VersionOneProgress): LearnerProgress {
-  return migrateLessonData(previous.lessons.completed, previous.lessons.reviews, previous.reflections);
+  return migrateLessonData(
+    previous.lessons?.completed,
+    previous.lessons?.reviews,
+    previous.reflections,
+  );
 }
 
 export function parseProgress(raw: string | null): ProgressLoadResult {
@@ -222,27 +160,63 @@ export function parseProgress(raw: string | null): ProgressLoadResult {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { status: 'recovery-required', progress: createEmptyProgress(), reason: 'Saved progress is not valid JSON.' };
+    return {
+      status: 'recovery-required',
+      progress: createEmptyProgress(),
+      reason: 'Saved progress is not valid JSON.',
+    };
   }
 
-  if (isLearnerProgress(parsed)) return { status: 'loaded', progress: parsed };
-  if (isVersionOneProgress(parsed)) return { status: 'migrated', progress: migrateVersionOneProgress(parsed) };
-  if (isLegacyProgress(parsed)) return { status: 'migrated', progress: migrateLegacyProgress(parsed) };
-
-  if (isRecord(parsed) && typeof parsed.version === 'number' && parsed.version > PROGRESS_VERSION) {
-    return { status: 'recovery-required', progress: createEmptyProgress(), reason: `Saved progress uses unsupported future version ${parsed.version}.` };
+  const stored = asStoredObject(parsed);
+  if (!stored) {
+    return {
+      status: 'recovery-required',
+      progress: createEmptyProgress(),
+      reason: 'Saved progress does not match a supported ReviewLab progress format.',
+    };
   }
 
-  return { status: 'recovery-required', progress: createEmptyProgress(), reason: 'Saved progress does not match a supported ReviewLab progress format.' };
+  if (stored.version === PROGRESS_VERSION) {
+    return {
+      status: 'loaded',
+      progress: hydrateProgress(stored as Partial<LearnerProgress>),
+    };
+  }
+
+  if (stored.version === 1) {
+    return {
+      status: 'migrated',
+      progress: migrateVersionOneProgress(stored as VersionOneProgress),
+    };
+  }
+
+  if (typeof stored.version === 'number' && stored.version > PROGRESS_VERSION) {
+    return {
+      status: 'recovery-required',
+      progress: createEmptyProgress(),
+      reason: `Saved progress uses unsupported future version ${stored.version}.`,
+    };
+  }
+
+  if ('completed' in stored || 'reviews' in stored) {
+    return {
+      status: 'migrated',
+      progress: migrateLegacyProgress(stored as LegacyProgress),
+    };
+  }
+
+  return {
+    status: 'recovery-required',
+    progress: createEmptyProgress(),
+    reason: 'Saved progress does not match a supported ReviewLab progress format.',
+  };
 }
 
 export function serializeProgress(progress: LearnerProgress): string {
-  if (!isLearnerProgress(progress)) throw new Error('Cannot save invalid ReviewLab progress.');
   return JSON.stringify(progress);
 }
 
 export function exportProgress(progress: LearnerProgress): string {
-  if (!isLearnerProgress(progress)) throw new Error('Cannot export invalid ReviewLab progress.');
   return JSON.stringify(progress, null, 2);
 }
 
