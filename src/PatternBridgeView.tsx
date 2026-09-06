@@ -3,9 +3,15 @@ import { ArrowLeftRight, ArrowRight, CheckCircle2, Layers3, Link2 } from 'lucide
 import { bridgePatterns } from './patterns';
 import SyntaxPanel from './SyntaxPanel';
 
-export default function PatternBridgeView() {
-  const [patternId, setPatternId] = useState(bridgePatterns[0].id);
-  const [conceptId, setConceptId] = useState(bridgePatterns[0].concepts[0].id);
+type PatternBridgeViewProps = {
+  initialPatternId?: string;
+  onPatternChange?: (patternId: string) => void;
+};
+
+export default function PatternBridgeView({ initialPatternId, onPatternChange }: PatternBridgeViewProps) {
+  const initialPattern = bridgePatterns.find((item) => item.id === initialPatternId) ?? bridgePatterns[0];
+  const [patternId, setPatternId] = useState(initialPattern.id);
+  const [conceptId, setConceptId] = useState(initialPattern.concepts[0].id);
   const pattern = bridgePatterns.find((item) => item.id === patternId) ?? bridgePatterns[0];
   const concept = pattern.concepts.find((item) => item.id === conceptId) ?? pattern.concepts[0];
   const patternIndex = bridgePatterns.findIndex((item) => item.id === pattern.id);
@@ -15,6 +21,7 @@ export default function PatternBridgeView() {
     if (!nextPattern) return;
     setPatternId(nextPattern.id);
     setConceptId(nextPattern.concepts[0].id);
+    onPatternChange?.(nextPattern.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
