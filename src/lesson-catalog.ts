@@ -5,36 +5,43 @@ import {
   validateLessonContent,
 } from './content-contract.ts';
 
-function migrateFirstLesson(lesson: Lesson): LessonContentContract {
-  const conceptIds = lesson.concepts.map((_, index) => `${lesson.id}-concept-${index + 1}`);
-  const findingIds = lesson.findings.map((_, index) => `${lesson.id}-finding-${index + 1}`);
+const criticalityByDifficulty = {
+  Foundation: 'foundation',
+  Core: 'core',
+  Production: 'production',
+} as const;
+
+function migrateLesson(lesson: Lesson, index: number): LessonContentContract {
+  const conceptIds = lesson.concepts.map((_, conceptIndex) => `${lesson.id}-concept-${conceptIndex + 1}`);
+  const findingIds = lesson.findings.map((_, findingIndex) => `${lesson.id}-finding-${findingIndex + 1}`);
+  const competencyId = `${lesson.id}-review`;
 
   const migrated = {
     ...lesson,
-    order: 1,
-    concepts: lesson.concepts.map((concept, index) => ({
+    order: index + 1,
+    concepts: lesson.concepts.map((concept, conceptIndex) => ({
       ...concept,
-      id: conceptIds[index],
+      id: conceptIds[conceptIndex],
     })),
-    findings: lesson.findings.map((finding, index) => ({
+    findings: lesson.findings.map((finding, findingIndex) => ({
       ...finding,
-      id: findingIds[index],
-      conceptIds: conceptIds,
+      id: findingIds[findingIndex],
+      conceptIds,
     })),
     quiz: {
       ...lesson.quiz,
-      competencyIds: [`${lesson.id}-review`],
+      competencyIds: [competencyId],
     },
     competencies: [
       {
-        id: `${lesson.id}-review`,
-        title: 'Review production C# semantics',
-        description: 'Identify semantic and maintainability risks in everyday C# code.',
+        id: competencyId,
+        title: `Review ${lesson.title}`,
+        description: lesson.outcome,
       },
     ],
-    criticality: 'foundation' as const,
+    criticality: criticalityByDifficulty[lesson.difficulty],
     assessment: {
-      competencyIds: [`${lesson.id}-review`],
+      competencyIds: [competencyId],
       requiredFindingIds: findingIds,
     },
   } satisfies LessonContentContract;
@@ -42,17 +49,12 @@ function migrateFirstLesson(lesson: Lesson): LessonContentContract {
   return validateLessonContent(migrated);
 }
 
-const [firstLegacyLesson, ...remainingLegacyLessons] = legacyLessons;
-
-if (!firstLegacyLesson) {
+if (legacyLessons.length === 0) {
   throw new Error('ReviewLab requires at least one authored lesson');
 }
 
-export const validatedLessons = validateLessonCollection([
-  migrateFirstLesson(firstLegacyLesson),
-]);
+export const validatedLessons = validateLessonCollection(
+  legacyLessons.map(migrateLesson),
+);
 
-export const lessons: Lesson[] = [
-  ...validatedLessons,
-  ...remainingLegacyLessons,
-];
+export const lessons: Lesson[] = validatedLessons;
