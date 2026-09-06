@@ -27,5 +27,10 @@ test.describe('ReviewLab critical journey', () => {
     await page.getByRole('button', { name: /Submit review/i }).click();
     await expect(page.getByText('REVIEW FEEDBACK')).toBeVisible();
     await expect(page.getByText(/You caught this/i).first()).toBeVisible();
+
+    await page.screenshot({
+      path: 'test-results/review-feedback-success.png',
+      fullPage: true,
+    });
   });
 });
