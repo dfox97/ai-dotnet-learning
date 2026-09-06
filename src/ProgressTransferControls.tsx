@@ -67,6 +67,7 @@ export default function ProgressTransferControls({ progress, onReplace }: Progre
           ref={inputRef}
           type="file"
           accept="application/json,.json"
+          aria-label="Select ReviewLab progress JSON to import"
           onChange={(event) => void selectImport(event)}
           hidden
         />
