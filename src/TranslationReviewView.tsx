@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight, Bot, Check, CheckCircle2, Eye, GitCompareArrows, RotateCcw, ShieldAlert, XCircle } from 'lucide-react';
-import { translationChallenges } from './patterns';
+import { translationChallenges } from './practice-catalog';
 import SyntaxPanel from './SyntaxPanel';
 
 type ChallengeState = {
