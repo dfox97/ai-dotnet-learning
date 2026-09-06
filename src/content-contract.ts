@@ -1,4 +1,4 @@
-import type { DecisionLab, Finding, Lesson, Quiz } from './content';
+import type { DecisionLab, Finding, Lesson, Quiz } from './content.ts';
 
 export type ContentCriticality = 'foundation' | 'core' | 'production';
 
