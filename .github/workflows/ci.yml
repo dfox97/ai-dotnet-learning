@@ -14,11 +14,25 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run validate:content
+      - name: Verify starter capstone exposes repair work
+        run: |
+          node scripts/generate-capstone.ts --output .tmp/capstone-starter
+          if dotnet test .tmp/capstone-starter/ReviewLab.Capstone.Tests/ReviewLab.Capstone.Tests.csproj --configuration Release; then
+            echo "Starter capstone unexpectedly passed; the intended repair evidence has disappeared."
+            exit 1
+          fi
+      - name: Verify expert capstone repair
+        run: |
+          node scripts/generate-capstone.ts --output .tmp/capstone-expert --variant expert
+          dotnet test .tmp/capstone-expert/ReviewLab.Capstone.Tests/ReviewLab.Capstone.Tests.csproj --configuration Release
       - run: npm --prefix e2e ci
       - run: npm --prefix e2e exec playwright install --with-deps chromium
       - run: npm --prefix e2e test
