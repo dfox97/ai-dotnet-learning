@@ -44,18 +44,15 @@ import {
   navigateToLearningLocation,
   resolveBrowserLocation,
 } from './browser-navigation';
+import { createEmptyProgress, type LearnerProgress, type ReviewState } from './progress';
+import { markLessonCompleted, setLessonReview } from './progress-operations';
+import {
+  loadLearnerProgress,
+  resetLearnerProgress,
+  saveLearnerProgress,
+} from './progress-store';
 
-type ReviewState = {
-  selected: number[];
-  note: string;
-  submitted: boolean;
-  quizAnswer: number | null;
-};
-
-type Progress = {
-  completed: string[];
-  reviews: Record<string, ReviewState>;
-};
+type Progress = LearnerProgress['lessons'];
 
 type Page = 'dashboard' | 'lesson' | 'glossary' | 'resources' | 'bridge' | 'translation';
 
@@ -73,11 +70,6 @@ const emptyReview: ReviewState = {
   quizAnswer: null,
 };
 
-const defaultProgress: Progress = {
-  completed: [],
-  reviews: {},
-};
-
 const lessonIds = new Set(lessons.map((lesson) => lesson.id));
 const bridgePatternIds = new Set(bridgePatterns.map((pattern) => pattern.id));
 const translationChallengeIds = new Set(translationChallenges.map((challenge) => challenge.id));
@@ -90,21 +82,6 @@ const knownLearningIds = {
 
 const iconForLesson = [Braces, TerminalSquare, Gauge, ServerCog, Database, Box, Blocks, ShieldCheck, Bot];
 const codeHighlighter = import('./syntax').then((module) => module.codeHighlighter);
-
-function loadProgress(): Progress {
-  try {
-    const saved = localStorage.getItem('reviewlab-progress');
-    if (!saved) return defaultProgress;
-
-    const parsed = JSON.parse(saved) as Progress;
-    if (!Array.isArray(parsed.completed) || typeof parsed.reviews !== 'object') {
-      return defaultProgress;
-    }
-    return parsed;
-  } catch {
-    return defaultProgress;
-  }
-}
 
 function resolveAppPath(pathname: string): AppLocationState {
   if (pathname === '/glossary') {
@@ -144,16 +121,20 @@ function severityLabel(severity: Finding['severity']) {
 function App() {
   const navigationHistory = useMemo(() => createWindowNavigationHistory(window), []);
   const initialNavigation = useMemo(() => resolveAppPath(navigationHistory.pathname), [navigationHistory]);
+  const initialProgress = useMemo(() => loadLearnerProgress(localStorage), []);
   const [page, setPage] = useState<Page>(initialNavigation.page);
   const [activeLessonId, setActiveLessonId] = useState(initialNavigation.activeLessonId);
   const [practiceId, setPracticeId] = useState<string | null>(initialNavigation.practiceId);
   const [recoveredFrom, setRecoveredFrom] = useState<string | null>(initialNavigation.recoveredFrom);
-  const [progress, setProgress] = useState<Progress>(loadProgress);
+  const [progress, setProgress] = useState<LearnerProgress>(initialProgress.progress);
+  const [progressRecoveryReason, setProgressRecoveryReason] = useState<string | null>(
+    initialProgress.status === 'recovery-required' ? initialProgress.reason : null,
+  );
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('reviewlab-progress', JSON.stringify(progress));
-  }, [progress]);
+    if (!progressRecoveryReason) saveLearnerProgress(localStorage, progress);
+  }, [progress, progressRecoveryReason]);
 
   useEffect(() => {
     if (initialNavigation.recoveredFrom) navigationHistory.replace('/');
@@ -170,9 +151,10 @@ function App() {
     });
   }, [initialNavigation.recoveredFrom, navigationHistory]);
 
+  const lessonProgress = progress.lessons;
   const activeLesson = lessons.find((lesson) => lesson.id === activeLessonId) ?? lessons[0];
-  const nextLesson = lessons.find((lesson) => !progress.completed.includes(lesson.id)) ?? null;
-  const percent = Math.round((progress.completed.length / lessons.length) * 100);
+  const nextLesson = lessons.find((lesson) => !lessonProgress.completed.includes(lesson.id)) ?? null;
+  const percent = Math.round((lessonProgress.completed.length / lessons.length) * 100);
 
   const openLesson = (lessonId: string) => {
     navigateToLearningLocation(navigationHistory, { kind: 'lesson', lessonId });
@@ -221,23 +203,25 @@ function App() {
   };
 
   const updateReview = (lessonId: string, nextReview: ReviewState) => {
-    setProgress((current) => ({
-      ...current,
-      reviews: { ...current.reviews, [lessonId]: nextReview },
-    }));
+    setProgress((current) => setLessonReview(current, lessonId, nextReview));
   };
 
   const completeLesson = (lessonId: string) => {
-    setProgress((current) => {
-      if (current.completed.includes(lessonId)) return current;
-      return { ...current, completed: [...current.completed, lessonId] };
-    });
+    setProgress((current) => markLessonCompleted(current, lessonId));
+  };
+
+  const acceptCleanProgress = () => {
+    resetLearnerProgress(localStorage);
+    setProgress(createEmptyProgress());
+    setProgressRecoveryReason(null);
   };
 
   const resetProgress = () => {
-    const confirmed = window.confirm('Reset all completed lessons and review notes?');
+    const confirmed = window.confirm('Reset all ReviewLab progress, including lessons and future journey state?');
     if (!confirmed) return;
-    setProgress(defaultProgress);
+    resetLearnerProgress(localStorage);
+    setProgress(createEmptyProgress());
+    setProgressRecoveryReason(null);
     setPracticeId(null);
     setRecoveredFrom(null);
     setPage('dashboard');
@@ -257,6 +241,15 @@ function App() {
 
       <main className="main-content">
         <MobileHeader onMenu={() => setMobileNavOpen(true)} />
+        {progressRecoveryReason && (
+          <section className="empty-state" role="alert">
+            <XCircle size={26} />
+            <h2>Saved progress needs recovery.</h2>
+            <p>{progressRecoveryReason}</p>
+            <p>Your stored value has not been overwritten. Start clean only when you are ready to replace it.</p>
+            <button className="secondary-button" onClick={acceptCleanProgress}>Start with clean progress</button>
+          </section>
+        )}
         {recoveredFrom && (
           <section className="empty-state" role="status">
             <XCircle size={26} />
@@ -267,7 +260,7 @@ function App() {
         )}
         {page === 'dashboard' && (
           <Dashboard
-            progress={progress}
+            progress={lessonProgress}
             percent={percent}
             nextLesson={nextLesson}
             onOpenLesson={openLesson}
@@ -277,7 +270,7 @@ function App() {
         {page === 'lesson' && (
           <LessonView
             lesson={activeLesson}
-            progress={progress}
+            progress={lessonProgress}
             onBack={() => openPage('dashboard')}
             onOpenLesson={openLesson}
             onUpdateReview={updateReview}
