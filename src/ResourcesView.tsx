@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowUpRight, BookMarked, Filter, Search, Sparkles } from 'lucide-react';
-import { resourceCategories, resources, type LearningResource } from './resources';
+import { resourceCategories, resources, type LearningResource } from './practice-catalog';
 
 const levelOrder: Record<LearningResource['level'], number> = {
   Foundation: 0,
