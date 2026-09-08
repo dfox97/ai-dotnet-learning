@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Code2, Play, TerminalSquare } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Code2, Play, ShieldAlert, TerminalSquare } from 'lucide-react';
 import {
   canRevealExpertAnswer,
   completeCapstone,
@@ -115,8 +115,19 @@ export default function CapstoneView({ progress, onBack, onProgress }: CapstoneV
       {stage === 'completed' && (
         <section className="results-section" aria-live="polite">
           <div className="score-card">
-            <div className="score-gauge good"><CheckCircle2 size={28} /><span>DONE</span></div>
-            <div><p className="eyebrow">CAPSTONE EVIDENCE RECORDED</p><h2>Your local repair journey is complete.</h2><p>{progress.testEvidence.length} test evidence entr{progress.testEvidence.length === 1 ? 'y' : 'ies'} and your reflection are stored in the versioned learner report.</p></div>
+            <div className={`score-gauge ${progress.mastery.status === 'mastered' ? 'good' : ''}`}>
+              {progress.mastery.status === 'mastered' ? <CheckCircle2 size={28} /> : <ShieldAlert size={28} />}
+              <span>{progress.mastery.status === 'mastered' ? 'PASS' : 'REVIEW'}</span>
+            </div>
+            <div>
+              <p className="eyebrow">CAPSTONE EVIDENCE RECORDED</p>
+              <h2>{progress.mastery.status === 'mastered' ? 'Critical competency gate is clear.' : 'The repair journey is complete; remediation still matters.'}</h2>
+              <p>{progress.testEvidence.length} test evidence entr{progress.testEvidence.length === 1 ? 'y' : 'ies'} and your reflection are stored in the versioned learner report.</p>
+            </div>
+          </div>
+          <div className="concept-grid">
+            <article className="concept-card"><span>CRITICAL MET</span><h3>{progress.mastery.criticalCompetenciesMet.length}</h3><p>{progress.mastery.criticalCompetenciesMet.join(', ') || 'None recorded'}</p></article>
+            <article className="concept-card"><span>UNRESOLVED</span><h3>{progress.mastery.unresolvedCriticalCompetencies.length}</h3><p>{progress.mastery.unresolvedCriticalCompetencies.join(', ') || 'No unresolved critical competencies'}</p></article>
           </div>
           <aside className="compiler-callout"><div className="callout-icon"><TerminalSquare size={23} /></div><div><span>REFLECTION</span><p>{progress.reflection}</p></div></aside>
         </section>
