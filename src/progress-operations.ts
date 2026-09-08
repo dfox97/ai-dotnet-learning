@@ -9,20 +9,6 @@ import type {
 
 export type PracticeArea = keyof LearnerProgress['practice'];
 
-export function setLessonReview(
-  progress: LearnerProgress,
-  lessonId: string,
-  review: ReviewState,
-): LearnerProgress {
-  return {
-    ...progress,
-    lessons: {
-      ...progress.lessons,
-      reviews: { ...progress.lessons.reviews, [lessonId]: review },
-    },
-  };
-}
-
 export function setLessonAttempt(
   progress: LearnerProgress,
   lessonId: string,
@@ -69,15 +55,33 @@ export function completeLessonAttempt(
   });
 }
 
-export function markLessonCompleted(progress: LearnerProgress, lessonId: string): LearnerProgress {
-  if (progress.lessons.completed.includes(lessonId)) return progress;
+export function setLessonReview(
+  progress: LearnerProgress,
+  lessonId: string,
+  review: ReviewState,
+): LearnerProgress {
+  const active = startLessonAttempt(progress, lessonId, new Date().toISOString());
   return {
-    ...progress,
+    ...active,
     lessons: {
-      ...progress.lessons,
-      completed: [...progress.lessons.completed, lessonId],
+      ...active.lessons,
+      reviews: { ...active.lessons.reviews, [lessonId]: review },
     },
   };
+}
+
+export function markLessonCompleted(progress: LearnerProgress, lessonId: string): LearnerProgress {
+  const withCompletion = progress.lessons.completed.includes(lessonId)
+    ? progress
+    : {
+        ...progress,
+        lessons: {
+          ...progress.lessons,
+          completed: [...progress.lessons.completed, lessonId],
+        },
+      };
+
+  return completeLessonAttempt(withCompletion, lessonId, new Date().toISOString());
 }
 
 export function setPracticeAttempt(
