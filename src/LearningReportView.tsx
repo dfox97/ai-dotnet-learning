@@ -87,10 +87,11 @@ export default function LearningReportView({ progress, onBack }: LearningReportV
         <div className="concept-grid">
           <article className="concept-card"><h3>{report.lessons.completedIds.length}</h3><p>Lessons completed</p></article>
           <article className="concept-card"><h3>{report.lessons.submittedReviewIds.length}</h3><p>Reviews submitted</p></article>
+          <article className="concept-card"><h3>{report.lessons.attempts}</h3><p>Lesson attempts</p></article>
+          <article className="concept-card"><h3>{report.lessons.timeSpentMinutes ?? 'Not recorded'}</h3><p>{report.lessons.timeSpentMinutes === null ? 'Lesson time' : 'Recorded lesson minutes'}</p></article>
           <article className="concept-card"><h3>{report.practice.completedActivityIds.length}</h3><p>Practice activities completed</p></article>
           <article className="concept-card"><h3>{report.practice.timeSpentMinutes ?? 'Not recorded'}</h3><p>{report.practice.timeSpentMinutes === null ? 'Practice time' : 'Recorded practice minutes'}</p></article>
         </div>
-        <p>Lesson time: {report.lessons.timeSpentMinutes === null ? 'not recorded by the current schema' : `${report.lessons.timeSpentMinutes} minutes`}.</p>
       </section>
 
       <section className="section-block">

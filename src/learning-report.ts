@@ -1,4 +1,4 @@
-import type { DiagnosticProgress, LearnerProgress } from './progress.ts';
+import type { ActivityAttempt, DiagnosticProgress, LearnerProgress } from './progress.ts';
 
 export type ReportDiagnostic = {
   status: DiagnosticProgress['status'];
@@ -19,6 +19,8 @@ export type LearningReportData = {
   lessons: {
     completedIds: string[];
     submittedReviewIds: string[];
+    attemptedIds: string[];
+    attempts: number;
     timeSpentMinutes: number | null;
   };
   practice: {
@@ -48,6 +50,31 @@ function reportDiagnostic(diagnostic: DiagnosticProgress): ReportDiagnostic {
   };
 }
 
+function measuredMinutes(attempts: ActivityAttempt[]): number | null {
+  let knownMinutes = 0;
+  let hasTimedAttempt = false;
+
+  for (const attempt of attempts) {
+    if (!attempt.startedAt || !attempt.completedAt) continue;
+    const start = Date.parse(attempt.startedAt);
+    const end = Date.parse(attempt.completedAt);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) continue;
+    knownMinutes += (end - start) / 60_000;
+    hasTimedAttempt = true;
+  }
+
+  return hasTimedAttempt ? Math.round(knownMinutes) : null;
+}
+
+function lessonEvidence(progress: LearnerProgress) {
+  const attempts = Object.entries(progress.lessons.attempts);
+  return {
+    attemptedIds: attempts.filter(([, attempt]) => attempt.attempts > 0).map(([id]) => id),
+    attempts: attempts.reduce((sum, [, attempt]) => sum + attempt.attempts, 0),
+    timeSpentMinutes: measuredMinutes(attempts.map(([, attempt]) => attempt)),
+  };
+}
+
 function practiceEvidence(progress: LearnerProgress) {
   const allAttempts = [
     ...Object.entries(progress.practice.patternBridge),
@@ -58,20 +85,9 @@ function practiceEvidence(progress: LearnerProgress) {
     .filter(([, attempt]) => attempt.status === 'completed')
     .map(([id]) => id);
 
-  let knownMinutes = 0;
-  let hasTimedAttempt = false;
-  for (const [, attempt] of allAttempts) {
-    if (!attempt.startedAt || !attempt.completedAt) continue;
-    const start = Date.parse(attempt.startedAt);
-    const end = Date.parse(attempt.completedAt);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) continue;
-    knownMinutes += (end - start) / 60_000;
-    hasTimedAttempt = true;
-  }
-
   return {
     completedActivityIds,
-    timeSpentMinutes: hasTimedAttempt ? Math.round(knownMinutes) : null,
+    timeSpentMinutes: measuredMinutes(allAttempts.map(([, attempt]) => attempt)),
   };
 }
 
@@ -93,7 +109,7 @@ export function buildLearningReport(progress: LearnerProgress): LearningReportDa
       submittedReviewIds: Object.entries(progress.lessons.reviews)
         .filter(([, review]) => review.submitted)
         .map(([id]) => id),
-      timeSpentMinutes: null,
+      ...lessonEvidence(progress),
     },
     practice: practiceEvidence(progress),
     recommendations: {
@@ -148,7 +164,8 @@ ${listOrNone(report.lessons.submittedReviewIds)}
 ### Practice activities
 ${listOrNone(report.practice.completedActivityIds)}
 
-- Lesson time spent: ${report.lessons.timeSpentMinutes === null ? 'Not recorded by the current progress schema' : `${report.lessons.timeSpentMinutes} minutes`}
+- Lesson attempts: ${report.lessons.attempts}
+- Lesson time spent: ${report.lessons.timeSpentMinutes === null ? 'Not recorded' : `${report.lessons.timeSpentMinutes} minutes`}
 - Recorded practice time: ${report.practice.timeSpentMinutes === null ? 'Not recorded' : `${report.practice.timeSpentMinutes} minutes`}
 
 ## Reflections

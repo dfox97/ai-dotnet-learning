@@ -26,6 +26,8 @@ test('migrates the existing lesson-only progress without losing learner data', (
   assert.equal(result.status, 'migrated');
   assert.deepEqual(result.progress.lessons.completed, ['csharp-foundations']);
   assert.equal(result.progress.lessons.reviews['csharp-foundations'].note, 'Prefer value semantics here.');
+  assert.equal(result.progress.lessons.attempts['csharp-foundations'].status, 'completed');
+  assert.equal(result.progress.lessons.attempts['csharp-foundations'].startedAt, null);
   assert.equal(result.progress.version, PROGRESS_VERSION);
 });
 
@@ -53,9 +55,37 @@ test('migrates the previous versioned progress format into the complete schema',
   assert.equal(result.progress.capstone.stage, 'not-started');
 });
 
+test('migrates v2 progress without inventing historical lesson timestamps', () => {
+  const previous = createEmptyProgress();
+  const v2 = {
+    ...previous,
+    version: 2,
+    lessons: {
+      completed: ['async-reliability'],
+      reviews: {},
+    },
+  };
+
+  const result = parseProgress(JSON.stringify(v2));
+  assert.equal(result.status, 'migrated');
+  assert.equal(result.progress.version, PROGRESS_VERSION);
+  assert.deepEqual(result.progress.lessons.attempts['async-reliability'], {
+    status: 'completed',
+    startedAt: null,
+    completedAt: null,
+    attempts: 1,
+  });
+});
+
 test('round-trips complete learner journey state', () => {
   const progress = createEmptyProgress();
   progress.lessons.completed.push('compiler-nullability');
+  progress.lessons.attempts['compiler-nullability'] = {
+    status: 'completed',
+    startedAt: '2026-09-06T08:00:00.000Z',
+    completedAt: '2026-09-06T08:20:00.000Z',
+    attempts: 1,
+  };
   progress.reflections['compiler-nullability'] = 'Nullable flow analysis is clearer now.';
   progress.practice.patternBridge['di-lifetimes'] = {
     status: 'completed',

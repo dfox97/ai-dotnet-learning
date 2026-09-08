@@ -9,29 +9,79 @@ import type {
 
 export type PracticeArea = keyof LearnerProgress['practice'];
 
-export function setLessonReview(
+export function setLessonAttempt(
   progress: LearnerProgress,
   lessonId: string,
-  review: ReviewState,
+  attempt: ActivityAttempt,
 ): LearnerProgress {
   return {
     ...progress,
     lessons: {
       ...progress.lessons,
-      reviews: { ...progress.lessons.reviews, [lessonId]: review },
+      attempts: { ...progress.lessons.attempts, [lessonId]: attempt },
+    },
+  };
+}
+
+export function startLessonAttempt(
+  progress: LearnerProgress,
+  lessonId: string,
+  startedAt: string,
+): LearnerProgress {
+  const existing = progress.lessons.attempts[lessonId];
+  if (existing?.status === 'in-progress' || existing?.status === 'completed') return progress;
+
+  return setLessonAttempt(progress, lessonId, {
+    status: 'in-progress',
+    startedAt: existing?.startedAt ?? startedAt,
+    completedAt: null,
+    attempts: (existing?.attempts ?? 0) + 1,
+  });
+}
+
+export function completeLessonAttempt(
+  progress: LearnerProgress,
+  lessonId: string,
+  completedAt: string,
+): LearnerProgress {
+  const existing = progress.lessons.attempts[lessonId];
+  if (existing?.status === 'completed') return progress;
+
+  return setLessonAttempt(progress, lessonId, {
+    status: 'completed',
+    startedAt: existing?.startedAt ?? null,
+    completedAt,
+    attempts: Math.max(existing?.attempts ?? 0, 1),
+  });
+}
+
+export function setLessonReview(
+  progress: LearnerProgress,
+  lessonId: string,
+  review: ReviewState,
+): LearnerProgress {
+  const active = startLessonAttempt(progress, lessonId, new Date().toISOString());
+  return {
+    ...active,
+    lessons: {
+      ...active.lessons,
+      reviews: { ...active.lessons.reviews, [lessonId]: review },
     },
   };
 }
 
 export function markLessonCompleted(progress: LearnerProgress, lessonId: string): LearnerProgress {
-  if (progress.lessons.completed.includes(lessonId)) return progress;
-  return {
-    ...progress,
-    lessons: {
-      ...progress.lessons,
-      completed: [...progress.lessons.completed, lessonId],
-    },
-  };
+  const withCompletion = progress.lessons.completed.includes(lessonId)
+    ? progress
+    : {
+        ...progress,
+        lessons: {
+          ...progress.lessons,
+          completed: [...progress.lessons.completed, lessonId],
+        },
+      };
+
+  return completeLessonAttempt(withCompletion, lessonId, new Date().toISOString());
 }
 
 export function setPracticeAttempt(

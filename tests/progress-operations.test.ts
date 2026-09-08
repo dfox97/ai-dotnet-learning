@@ -12,7 +12,7 @@ import {
 } from '../src/progress-operations.ts';
 import { createEmptyProgress } from '../src/progress.ts';
 
-test('updates lesson review and completion without mutating the previous document', () => {
+test('updates lesson review, timing and completion without mutating the previous document', () => {
   const initial = createEmptyProgress();
   const reviewed = setLessonReview(initial, 'async-reliability', {
     selected: [3], note: 'Cancellation is dropped.', submitted: true, quizAnswer: 1,
@@ -21,8 +21,13 @@ test('updates lesson review and completion without mutating the previous documen
 
   assert.deepEqual(initial.lessons.reviews, {});
   assert.deepEqual(initial.lessons.completed, []);
+  assert.deepEqual(initial.lessons.attempts, {});
+  assert.equal(reviewed.lessons.attempts['async-reliability'].status, 'in-progress');
+  assert.ok(reviewed.lessons.attempts['async-reliability'].startedAt);
   assert.equal(completed.lessons.reviews['async-reliability'].submitted, true);
   assert.deepEqual(completed.lessons.completed, ['async-reliability']);
+  assert.equal(completed.lessons.attempts['async-reliability'].status, 'completed');
+  assert.ok(completed.lessons.attempts['async-reliability'].completedAt);
 });
 
 test('tracks practice attempts and timestamps across resume', () => {
