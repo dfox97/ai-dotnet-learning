@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowRight, CheckCircle2, FileText, Gauge, ShieldAlert, TerminalSquare } from 'lucide-react';
 import CapstoneView from './CapstoneView';
+import CompetencyStatusSummary from './CompetencyStatusSummary';
 import DiagnosticView from './DiagnosticView';
 import LearningReportView from './LearningReportView';
 import { baselineDiagnostic } from './baseline-diagnostic';
@@ -86,6 +87,13 @@ export function JourneyLaunchpad() {
             <div><p className="eyebrow">PERSONALISED PATH</p><h2>Recommended from your baseline evidence</h2><p>Recommendations explain the competency gap they address; nothing is hard-locked.</p></div>
             <span className="path-caption"><CheckCircle2 size={16} /> Baseline complete</span>
           </div>
+          {recommendation && (
+            <CompetencyStatusSummary
+              masteredCompetencyIds={recommendation.masteredCompetencyIds}
+              atRiskCompetencyIds={recommendation.atRiskCompetencyIds}
+              criticalAtRiskCompetencyIds={recommendation.criticalAtRiskCompetencyIds}
+            />
+          )}
           <div className="lesson-list">
             {recommendation?.activities.length ? recommendation.activities.map((activity) => (
               <button
