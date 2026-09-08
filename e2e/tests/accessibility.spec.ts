@@ -73,4 +73,26 @@ test.describe('ReviewLab accessibility regressions', () => {
       expect(active.visible).toBe(true);
     }
   });
+
+  test('reduced-motion preference disables smooth scrolling and transitions', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+
+    const styles = await page.evaluate(() => {
+      const button = document.querySelector('button');
+      const transitionDuration = button ? getComputedStyle(button).transitionDuration : null;
+      const transitionDurationMs = transitionDuration
+        ? Number.parseFloat(transitionDuration) * (transitionDuration.endsWith('ms') ? 1 : 1000)
+        : null;
+
+      return {
+        scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
+        transitionDurationMs,
+      };
+    });
+
+    expect(styles.scrollBehavior).toBe('auto');
+    expect(styles.transitionDurationMs).not.toBeNull();
+    expect(styles.transitionDurationMs!).toBeLessThanOrEqual(0.01);
+  });
 });
