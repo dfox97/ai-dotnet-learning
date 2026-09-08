@@ -23,6 +23,52 @@ export function setLessonReview(
   };
 }
 
+export function setLessonAttempt(
+  progress: LearnerProgress,
+  lessonId: string,
+  attempt: ActivityAttempt,
+): LearnerProgress {
+  return {
+    ...progress,
+    lessons: {
+      ...progress.lessons,
+      attempts: { ...progress.lessons.attempts, [lessonId]: attempt },
+    },
+  };
+}
+
+export function startLessonAttempt(
+  progress: LearnerProgress,
+  lessonId: string,
+  startedAt: string,
+): LearnerProgress {
+  const existing = progress.lessons.attempts[lessonId];
+  if (existing?.status === 'in-progress' || existing?.status === 'completed') return progress;
+
+  return setLessonAttempt(progress, lessonId, {
+    status: 'in-progress',
+    startedAt: existing?.startedAt ?? startedAt,
+    completedAt: null,
+    attempts: (existing?.attempts ?? 0) + 1,
+  });
+}
+
+export function completeLessonAttempt(
+  progress: LearnerProgress,
+  lessonId: string,
+  completedAt: string,
+): LearnerProgress {
+  const existing = progress.lessons.attempts[lessonId];
+  if (existing?.status === 'completed') return progress;
+
+  return setLessonAttempt(progress, lessonId, {
+    status: 'completed',
+    startedAt: existing?.startedAt ?? null,
+    completedAt,
+    attempts: Math.max(existing?.attempts ?? 0, 1),
+  });
+}
+
 export function markLessonCompleted(progress: LearnerProgress, lessonId: string): LearnerProgress {
   if (progress.lessons.completed.includes(lessonId)) return progress;
   return {
