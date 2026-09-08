@@ -1,3 +1,4 @@
+import { applyDeploymentBasePath, stripDeploymentBasePath } from './base-path.ts';
 import {
   buildLearningPath,
   isKnownLearningLocation,
@@ -52,19 +53,22 @@ export function replaceWithResolvedLocation(
   history.replace(buildLearningPath(resolved.location));
 }
 
-export function createWindowNavigationHistory(windowLike: Window): NavigationHistory {
+export function createWindowNavigationHistory(windowLike: Window, basePath = import.meta.env.BASE_URL): NavigationHistory {
+  const toInternalPath = (pathname: string) => stripDeploymentBasePath(pathname, basePath) ?? pathname;
+  const toPublicPath = (path: string) => applyDeploymentBasePath(path, basePath);
+
   return {
     get pathname() {
-      return windowLike.location.pathname;
+      return toInternalPath(windowLike.location.pathname);
     },
     push(path: string) {
-      windowLike.history.pushState(null, '', path);
+      windowLike.history.pushState(null, '', toPublicPath(path));
     },
     replace(path: string) {
-      windowLike.history.replaceState(null, '', path);
+      windowLike.history.replaceState(null, '', toPublicPath(path));
     },
     subscribe(listener) {
-      const handlePopState = () => listener(windowLike.location.pathname);
+      const handlePopState = () => listener(toInternalPath(windowLike.location.pathname));
       windowLike.addEventListener('popstate', handlePopState);
       return () => windowLike.removeEventListener('popstate', handlePopState);
     },
