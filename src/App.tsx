@@ -1,5 +1,6 @@
 import JourneySurface, { JourneyLaunchpad } from './JourneyShell';
 import WorkspaceApp from './WorkspaceApp';
+import { stripDeploymentBasePath } from './base-path';
 import './journey-shell.css';
 
 function isJourneyPath(pathname: string) {
@@ -7,7 +8,7 @@ function isJourneyPath(pathname: string) {
 }
 
 export default function App() {
-  const pathname = window.location.pathname;
+  const pathname = stripDeploymentBasePath(window.location.pathname, import.meta.env.BASE_URL) ?? '/';
 
   if (isJourneyPath(pathname)) {
     return <JourneySurface pathname={pathname} />;
