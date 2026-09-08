@@ -15,6 +15,7 @@ test('reports incomplete activity honestly instead of inventing zero scores', ()
   assert.equal(report.diagnostics.post.score, null);
   assert.deepEqual(report.competencyChanges, {});
   assert.equal(report.lessons.timeSpentMinutes, null);
+  assert.equal(report.lessons.attempts, 0);
   assert.equal(report.practice.timeSpentMinutes, null);
 });
 
@@ -32,11 +33,17 @@ test('only compares competencies measured in both diagnostics', () => {
   assert.equal(report.diagnostics.post.score, 1);
 });
 
-test('includes lesson, practice, reflection and capstone evidence in documented JSON', () => {
+test('includes timed lesson, practice, reflection and capstone evidence in documented JSON', () => {
   const progress = createEmptyProgress();
   progress.lessons.completed.push('async-reliability');
   progress.lessons.reviews['async-reliability'] = {
     selected: [3], note: 'Cancellation was dropped.', submitted: true, quizAnswer: 1,
+  };
+  progress.lessons.attempts['async-reliability'] = {
+    status: 'completed',
+    startedAt: '2026-09-06T09:30:00.000Z',
+    completedAt: '2026-09-06T10:00:00.000Z',
+    attempts: 2,
   };
   progress.practice.patternBridge['di-lifetimes'] = {
     status: 'completed',
@@ -52,6 +59,9 @@ test('includes lesson, practice, reflection and capstone evidence in documented 
 
   const parsed = JSON.parse(exportLearningReportJson(progress));
   assert.deepEqual(parsed.lessons.completedIds, ['async-reliability']);
+  assert.deepEqual(parsed.lessons.attemptedIds, ['async-reliability']);
+  assert.equal(parsed.lessons.attempts, 2);
+  assert.equal(parsed.lessons.timeSpentMinutes, 30);
   assert.deepEqual(parsed.practice.completedActivityIds, ['di-lifetimes']);
   assert.equal(parsed.practice.timeSpentMinutes, 12);
   assert.equal(parsed.capstone.stage, 'completed');
@@ -64,7 +74,8 @@ test('keeps the readable Markdown report structure stable', () => {
   assert.match(markdown, /## Diagnostic evidence/);
   assert.match(markdown, /## Competency change/);
   assert.match(markdown, /## Learning activity/);
+  assert.match(markdown, /Lesson attempts: 0/);
+  assert.match(markdown, /Lesson time spent: Not recorded/);
   assert.match(markdown, /## Reflections/);
   assert.match(markdown, /## Capstone/);
-  assert.match(markdown, /Not recorded by the current progress schema/);
 });
