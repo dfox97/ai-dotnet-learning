@@ -122,6 +122,11 @@ export function buildLearningReport(progress: LearnerProgress): LearningReportDa
       ...progress.capstone,
       findings: { ...progress.capstone.findings },
       testEvidence: [...progress.capstone.testEvidence],
+      mastery: {
+        ...progress.capstone.mastery,
+        criticalCompetenciesMet: [...progress.capstone.mastery.criticalCompetenciesMet],
+        unresolvedCriticalCompetencies: [...progress.capstone.mastery.unresolvedCriticalCompetencies],
+      },
     },
   };
 }
@@ -176,6 +181,9 @@ ${reflectionLines.length > 0 ? reflectionLines.join('\n') : '- None recorded'}
 
 - Version: ${report.capstone.version ?? 'Not started'}
 - Stage: ${report.capstone.stage}
+- Mastery outcome: ${report.capstone.mastery.status}
+- Critical competencies met: ${report.capstone.mastery.criticalCompetenciesMet.length > 0 ? report.capstone.mastery.criticalCompetenciesMet.join(', ') : 'None recorded'}
+- Unresolved critical competencies: ${report.capstone.mastery.unresolvedCriticalCompetencies.length > 0 ? report.capstone.mastery.unresolvedCriticalCompetencies.join(', ') : 'None recorded'}
 - Test evidence entries: ${report.capstone.testEvidence.length}
 - Reflection: ${report.capstone.reflection || 'Not recorded'}
 `;
