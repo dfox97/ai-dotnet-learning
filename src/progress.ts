@@ -1,5 +1,5 @@
 export const PROGRESS_STORAGE_KEY = 'reviewlab-progress';
-export const PROGRESS_VERSION = 2 as const;
+export const PROGRESS_VERSION = 3 as const;
 
 export type ReviewState = {
   selected: number[];
@@ -43,6 +43,7 @@ export type LearnerProgress = {
   lessons: {
     completed: string[];
     reviews: Record<string, ReviewState>;
+    attempts: Record<string, ActivityAttempt>;
   };
   practice: {
     patternBridge: Record<string, ActivityAttempt>;
@@ -72,6 +73,14 @@ type VersionOneProgress = {
   reflections?: Record<string, string>;
 };
 
+type VersionTwoProgress = Omit<LearnerProgress, 'version' | 'lessons'> & {
+  version: 2;
+  lessons: {
+    completed: string[];
+    reviews: Record<string, ReviewState>;
+  };
+};
+
 export type ProgressLoadResult =
   | { status: 'empty'; progress: LearnerProgress }
   | { status: 'loaded'; progress: LearnerProgress }
@@ -92,7 +101,7 @@ function createEmptyDiagnostic(): DiagnosticProgress {
 export function createEmptyProgress(): LearnerProgress {
   return {
     version: PROGRESS_VERSION,
-    lessons: { completed: [], reviews: {} },
+    lessons: { completed: [], reviews: {}, attempts: {} },
     practice: { patternBridge: {}, translationReview: {}, decisionLabs: {} },
     diagnostics: { baseline: createEmptyDiagnostic(), post: createEmptyDiagnostic() },
     recommendations: { activityIds: [], masteredCompetencyIds: [], atRiskCompetencyIds: [] },
@@ -129,6 +138,15 @@ function hydrateProgress(saved: Partial<LearnerProgress>): LearnerProgress {
   };
 }
 
+function migratedLessonAttempts(completed: string[]): Record<string, ActivityAttempt> {
+  return Object.fromEntries(completed.map((lessonId) => [lessonId, {
+    status: 'completed' as const,
+    startedAt: null,
+    completedAt: null,
+    attempts: 1,
+  }]));
+}
+
 function migrateLessonData(
   completed: string[] = [],
   reviews: Record<string, ReviewState> = {},
@@ -137,6 +155,7 @@ function migrateLessonData(
   const progress = createEmptyProgress();
   progress.lessons.completed = completed;
   progress.lessons.reviews = reviews;
+  progress.lessons.attempts = migratedLessonAttempts(completed);
   progress.reflections = reflections;
   return progress;
 }
@@ -151,6 +170,17 @@ export function migrateVersionOneProgress(previous: VersionOneProgress): Learner
     previous.lessons?.reviews,
     previous.reflections,
   );
+}
+
+export function migrateVersionTwoProgress(previous: VersionTwoProgress): LearnerProgress {
+  return hydrateProgress({
+    ...previous,
+    version: PROGRESS_VERSION,
+    lessons: {
+      ...previous.lessons,
+      attempts: migratedLessonAttempts(previous.lessons.completed),
+    },
+  });
 }
 
 export function parseProgress(raw: string | null): ProgressLoadResult {
@@ -180,6 +210,13 @@ export function parseProgress(raw: string | null): ProgressLoadResult {
     return {
       status: 'loaded',
       progress: hydrateProgress(stored as Partial<LearnerProgress>),
+    };
+  }
+
+  if (stored.version === 2) {
+    return {
+      status: 'migrated',
+      progress: migrateVersionTwoProgress(stored as VersionTwoProgress),
     };
   }
 
