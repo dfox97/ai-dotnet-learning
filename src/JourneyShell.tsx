@@ -5,12 +5,13 @@ import CompetencyStatusSummary from './CompetencyStatusSummary';
 import DiagnosticView from './DiagnosticView';
 import LearningReportView from './LearningReportView';
 import { baselineDiagnostic } from './baseline-diagnostic';
+import { evaluateCapstoneCriticalCompetencies } from './capstone-journey';
 import { scoreDiagnostic, type DiagnosticCompetencyId, type DiagnosticResult } from './diagnostic-engine';
 import { postDiagnostic, assessMastery } from './post-diagnostic';
 import { setCapstoneProgress, setDiagnosticProgress, setRecommendationProgress } from './progress-operations';
 import { loadLearnerProgress, saveLearnerProgress } from './progress-store';
-import type { DiagnosticProgress, LearnerProgress } from './progress';
-import { recommendLearningPath } from './recommendations';
+import type { CapstoneProgress, DiagnosticProgress, LearnerProgress } from './progress';
+import { criticalCompetencies, recommendLearningPath } from './recommendations';
 
 function navigate(path: string) {
   window.location.assign(path);
@@ -181,6 +182,25 @@ export default function JourneySurface({ pathname }: { pathname: string }) {
     replaceProgress(next);
   };
 
+  const updateCapstone = (capstone: CapstoneProgress) => {
+    let assessed = capstone;
+    if (capstone.stage === 'completed' && capstone.mastery.status === 'not-assessed') {
+      const evaluation = evaluateCapstoneCriticalCompetencies(
+        progress.recommendations.masteredCompetencyIds,
+        criticalCompetencies,
+      );
+      assessed = {
+        ...capstone,
+        mastery: {
+          status: evaluation.completed ? 'mastered' : 'needs-remediation',
+          criticalCompetenciesMet: evaluation.criticalCompetenciesMet,
+          unresolvedCriticalCompetencies: evaluation.unresolvedCriticalCompetencies,
+        },
+      };
+    }
+    replaceProgress(setCapstoneProgress(progress, assessed));
+  };
+
   if (recoveryReason) {
     return (
       <main className="main-content">
@@ -246,7 +266,7 @@ export default function JourneySurface({ pathname }: { pathname: string }) {
         <CapstoneView
           progress={progress.capstone}
           onBack={() => navigate('/')}
-          onProgress={(capstone) => replaceProgress(setCapstoneProgress(progress, capstone))}
+          onProgress={updateCapstone}
         />
       </main>
     );

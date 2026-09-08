@@ -66,6 +66,11 @@ test('persists diagnostic, recommendation, reflection and capstone domains indep
     findings: { cancellation: 'Token dropped.' },
     testEvidence: [],
     reflection: '',
+    mastery: {
+      status: 'not-assessed',
+      criticalCompetenciesMet: [],
+      unresolvedCriticalCompetencies: [],
+    },
   });
 
   assert.equal(progress.diagnostics.baseline.status, 'completed');

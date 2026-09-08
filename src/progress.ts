@@ -1,5 +1,5 @@
 export const PROGRESS_STORAGE_KEY = 'reviewlab-progress';
-export const PROGRESS_VERSION = 3 as const;
+export const PROGRESS_VERSION = 4 as const;
 
 export type ReviewState = {
   selected: number[];
@@ -30,12 +30,19 @@ export type RecommendationProgress = {
   atRiskCompetencyIds: string[];
 };
 
+export type CapstoneMasteryOutcome = {
+  status: 'not-assessed' | 'mastered' | 'needs-remediation';
+  criticalCompetenciesMet: string[];
+  unresolvedCriticalCompetencies: string[];
+};
+
 export type CapstoneProgress = {
   version: number | null;
   stage: 'not-started' | 'review' | 'repair' | 'evidence' | 'completed';
   findings: Record<string, string>;
   testEvidence: string[];
   reflection: string;
+  mastery: CapstoneMasteryOutcome;
 };
 
 export type LearnerProgress = {
@@ -73,12 +80,27 @@ type VersionOneProgress = {
   reflections?: Record<string, string>;
 };
 
-type VersionTwoProgress = Omit<LearnerProgress, 'version' | 'lessons'> & {
+type VersionTwoProgress = {
   version: 2;
   lessons: {
     completed: string[];
     reviews: Record<string, ReviewState>;
   };
+  practice?: LearnerProgress['practice'];
+  diagnostics?: LearnerProgress['diagnostics'];
+  recommendations?: RecommendationProgress;
+  reflections?: Record<string, string>;
+  capstone?: Omit<CapstoneProgress, 'mastery'>;
+};
+
+type VersionThreeProgress = {
+  version: 3;
+  lessons: LearnerProgress['lessons'];
+  practice?: LearnerProgress['practice'];
+  diagnostics?: LearnerProgress['diagnostics'];
+  recommendations?: RecommendationProgress;
+  reflections?: Record<string, string>;
+  capstone?: Omit<CapstoneProgress, 'mastery'>;
 };
 
 export type ProgressLoadResult =
@@ -98,6 +120,14 @@ function createEmptyDiagnostic(): DiagnosticProgress {
   };
 }
 
+function createEmptyCapstoneMastery(): CapstoneMasteryOutcome {
+  return {
+    status: 'not-assessed',
+    criticalCompetenciesMet: [],
+    unresolvedCriticalCompetencies: [],
+  };
+}
+
 export function createEmptyProgress(): LearnerProgress {
   return {
     version: PROGRESS_VERSION,
@@ -112,6 +142,7 @@ export function createEmptyProgress(): LearnerProgress {
       findings: {},
       testEvidence: [],
       reflection: '',
+      mastery: createEmptyCapstoneMastery(),
     },
   };
 }
@@ -134,7 +165,11 @@ function hydrateProgress(saved: Partial<LearnerProgress>): LearnerProgress {
     diagnostics: { ...empty.diagnostics, ...saved.diagnostics },
     recommendations: { ...empty.recommendations, ...saved.recommendations },
     reflections: saved.reflections ?? empty.reflections,
-    capstone: { ...empty.capstone, ...saved.capstone },
+    capstone: {
+      ...empty.capstone,
+      ...saved.capstone,
+      mastery: { ...empty.capstone.mastery, ...saved.capstone?.mastery },
+    },
   };
 }
 
@@ -172,15 +207,33 @@ export function migrateVersionOneProgress(previous: VersionOneProgress): Learner
   );
 }
 
-export function migrateVersionTwoProgress(previous: VersionTwoProgress): LearnerProgress {
+function hydratePreMasteryProgress(previous: VersionTwoProgress | VersionThreeProgress): LearnerProgress {
+  const empty = createEmptyProgress();
+  const lessons = previous.version === 2
+    ? {
+        ...previous.lessons,
+        attempts: migratedLessonAttempts(previous.lessons.completed),
+      }
+    : previous.lessons;
+
   return hydrateProgress({
-    ...previous,
-    version: PROGRESS_VERSION,
-    lessons: {
-      ...previous.lessons,
-      attempts: migratedLessonAttempts(previous.lessons.completed),
-    },
+    lessons,
+    practice: previous.practice ?? empty.practice,
+    diagnostics: previous.diagnostics ?? empty.diagnostics,
+    recommendations: previous.recommendations ?? empty.recommendations,
+    reflections: previous.reflections ?? empty.reflections,
+    capstone: previous.capstone
+      ? { ...empty.capstone, ...previous.capstone, mastery: createEmptyCapstoneMastery() }
+      : empty.capstone,
   });
+}
+
+export function migrateVersionTwoProgress(previous: VersionTwoProgress): LearnerProgress {
+  return hydratePreMasteryProgress(previous);
+}
+
+export function migrateVersionThreeProgress(previous: VersionThreeProgress): LearnerProgress {
+  return hydratePreMasteryProgress(previous);
 }
 
 export function parseProgress(raw: string | null): ProgressLoadResult {
@@ -210,6 +263,13 @@ export function parseProgress(raw: string | null): ProgressLoadResult {
     return {
       status: 'loaded',
       progress: hydrateProgress(stored as Partial<LearnerProgress>),
+    };
+  }
+
+  if (stored.version === 3) {
+    return {
+      status: 'migrated',
+      progress: migrateVersionThreeProgress(stored as VersionThreeProgress),
     };
   }
 
