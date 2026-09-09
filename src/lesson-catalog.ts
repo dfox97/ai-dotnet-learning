@@ -1,4 +1,5 @@
-import { lessons as legacyLessons, type Lesson } from './content.ts';
+import { lessons as legacyLessons } from './content.ts';
+import type { Lesson } from './lesson-types.ts';
 import {
   type LessonContentContract,
   validateLessonCollection,
