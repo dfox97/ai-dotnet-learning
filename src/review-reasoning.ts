@@ -1,4 +1,4 @@
-import type { Finding } from './content.ts';
+import type { Finding } from './lesson-types.ts';
 import type { ReviewState } from './progress.ts';
 
 export type ReviewSeverity = Finding['severity'];
