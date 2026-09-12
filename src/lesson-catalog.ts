@@ -58,4 +58,4 @@ export const validatedLessons = validateLessonCollection(
   authoredLessons.map(migrateLesson),
 );
 
-export const lessons: Lesson[] = validatedLessons;
+export const lessons = validatedLessons;
