@@ -1,4 +1,4 @@
-import { lessons as legacyLessons } from './content.ts';
+import { lessons as authoredLessons } from './authored-lessons.ts';
 import type { Lesson } from './lesson-types.ts';
 import {
   type LessonContentContract,
@@ -50,12 +50,12 @@ function migrateLesson(lesson: Lesson, index: number): LessonContentContract {
   return validateLessonContent(migrated);
 }
 
-if (legacyLessons.length === 0) {
+if (authoredLessons.length === 0) {
   throw new Error('ReviewLab requires at least one authored lesson');
 }
 
 export const validatedLessons = validateLessonCollection(
-  legacyLessons.map(migrateLesson),
+  authoredLessons.map(migrateLesson),
 );
 
 export const lessons: Lesson[] = validatedLessons;
