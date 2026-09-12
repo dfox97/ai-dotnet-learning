@@ -26,7 +26,8 @@ test.describe('ReviewLab critical journey', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByText('1 line flagged')).toBeVisible();
 
-    await page.getByLabel('Risk for line 1').fill('The generated declaration weakens the intended contract and can hide a production failure.');
+    const reasoning = 'The generated declaration weakens the intended contract and can hide a production failure.';
+    await page.getByLabel('Risk for line 1').fill(reasoning);
     await page.getByLabel('Correction for line 1').fill('Use the explicit C# contract described by the module rather than relying on the generated shortcut.');
 
     await page.getByRole('button', { name: /Submit review/i }).click();
@@ -41,7 +42,8 @@ test.describe('ReviewLab critical journey', () => {
 
     await page.reload();
     await expect(page.getByText('REVIEW FEEDBACK')).toBeVisible();
-    await expect(page.getByText('The generated declaration weakens the intended contract and can hide a production failure.')).toBeVisible();
+    await expect(page.getByLabel('Risk for line 1')).toHaveValue(reasoning);
+    await expect(page.getByText(`Your reasoning: ${reasoning}`, { exact: false })).toBeVisible();
 
     await page.screenshot({
       path: 'test-results/review-feedback-success.png',
