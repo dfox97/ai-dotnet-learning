@@ -5,6 +5,8 @@ import {
   evaluateStructuredReview,
   migrateLineOnlyReview,
   objectiveReviewScore,
+  persistStructuredReview,
+  readStructuredReview,
   type StructuredReviewAttempt,
 } from '../src/review-reasoning.ts';
 import {
@@ -42,6 +44,33 @@ test('migrates existing line-only attempts without losing selected lines or note
   assert.equal(migrated.findings[0].risk, 'This work cannot stop safely.');
   assert.equal(migrated.findings[0].reasoningAssessment, 'not-assessed');
   assert.equal(migrated.submitted, true);
+});
+
+test('persists structured findings without breaking the existing review shape', () => {
+  const legacy = {
+    selected: [3],
+    note: 'Legacy note stays readable.',
+    submitted: false,
+    quizAnswer: null,
+  };
+  const attempt: StructuredReviewAttempt = {
+    submitted: true,
+    quizAnswer: 1,
+    findings: [{
+      line: 3,
+      severity: 'blocker',
+      risk: 'Cancellation is dropped.',
+      correction: 'Propagate the token.',
+      reasoningAssessment: 'meets',
+    }],
+  };
+
+  const persisted = persistStructuredReview(legacy, attempt);
+  const restored = readStructuredReview(persisted, expected);
+
+  assert.deepEqual(persisted.selected, [3]);
+  assert.equal(persisted.note, 'Legacy note stays readable.');
+  assert.deepEqual(restored, attempt);
 });
 
 test('distinguishes misses, false positives, severity disagreement and incomplete reasoning', () => {
