@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { baselineDiagnostic } from '../src/baseline-diagnostic.ts';
 import { scoreDiagnostic } from '../src/diagnostic-engine.ts';
-import { assessMastery, postDiagnostic } from '../src/post-diagnostic.ts';
+import { assessMastery, postDiagnostic, remediationVariants } from '../src/post-diagnostic.ts';
 
 function responses(assessment: typeof baselineDiagnostic, wrongCompetency?: string) {
   return Object.fromEntries(assessment.questions.map((question) => {
@@ -30,6 +30,7 @@ test('awards mastery when the post score passes and no critical risk remains', (
   assert.equal(mastery.mastered, true);
   assert.ok((mastery.overallImprovement ?? 0) > 0);
   assert.deepEqual(mastery.unresolvedCriticalCompetencies, []);
+  assert.deepEqual(mastery.remediationVariants, []);
 });
 
 test('blocks mastery when a critical competency is unresolved despite a passing overall score', () => {
@@ -41,6 +42,8 @@ test('blocks mastery when a critical competency is unresolved despite a passing 
   assert.equal(mastery.mastered, false);
   assert.deepEqual(mastery.unresolvedCriticalCompetencies, ['tool-authority']);
   assert.deepEqual(mastery.remediationActivityIds, ['agentic-dotnet']);
+  assert.deepEqual(mastery.remediationVariants, [remediationVariants['tool-authority']]);
+  assert.match(mastery.remediationVariants[0].guidance, /deterministic policy/i);
 });
 
 test('does not award mastery for an interrupted post assessment', () => {
@@ -54,4 +57,17 @@ test('does not award mastery for an interrupted post assessment', () => {
   assert.equal(post.score, null);
   assert.equal(mastery.mastered, false);
   assert.equal(mastery.overallImprovement, null);
+});
+
+test('every critical competency has authored remediation copy and a next activity', () => {
+  const criticalCompetencies = postDiagnostic.questions
+    .filter((question) => question.critical)
+    .map((question) => question.competencyId);
+
+  for (const competencyId of criticalCompetencies) {
+    const variant = remediationVariants[competencyId];
+    assert.ok(variant.title.trim());
+    assert.ok(variant.guidance.trim());
+    assert.ok(variant.activityIds.length > 0);
+  }
 });
