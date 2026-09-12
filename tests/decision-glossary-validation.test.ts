@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { glossary, lessons } from '../src/content.ts';
+import { glossary } from '../src/content.ts';
 import {
   PracticeReferenceValidationError,
   validateDecisionLab,
   validateDecisionLabs,
   validateGlossary,
 } from '../src/decision-glossary-validation.ts';
+import { validatedLessons as lessons } from '../src/lesson-catalog.ts';
 
 test('validates every authored decision lab and glossary entry', () => {
   const labs = validateDecisionLabs(lessons);
