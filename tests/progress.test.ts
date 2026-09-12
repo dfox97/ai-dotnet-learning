@@ -77,6 +77,32 @@ test('migrates v2 progress without inventing historical lesson timestamps', () =
   });
 });
 
+test('migrates v4 post-diagnostic evidence without inventing remediation attempts', () => {
+  const previous = createEmptyProgress();
+  const originalPost = {
+    assessmentId: 'post-production-review',
+    assessmentVersion: 1,
+    status: 'completed' as const,
+    responses: { 'post-tool': 'prompt-hard' },
+    competencyScores: { 'tool-authority': 0 },
+    criticalRisks: ['tool-authority'],
+  };
+  const v4 = {
+    ...previous,
+    version: 4,
+    diagnostics: {
+      baseline: previous.diagnostics.baseline,
+      post: originalPost,
+    },
+  };
+
+  const result = parseProgress(JSON.stringify(v4));
+  assert.equal(result.status, 'migrated');
+  assert.equal(result.progress.version, PROGRESS_VERSION);
+  assert.deepEqual(result.progress.diagnostics.post, originalPost);
+  assert.deepEqual(result.progress.diagnostics.postAttempts, []);
+});
+
 test('round-trips complete learner journey state', () => {
   const progress = createEmptyProgress();
   progress.lessons.completed.push('compiler-nullability');
@@ -101,6 +127,14 @@ test('round-trips complete learner journey state', () => {
     competencyScores: { cancellation: 1 },
     criticalRisks: [],
   };
+  progress.diagnostics.postAttempts.push({
+    assessmentId: 'post-production-review',
+    assessmentVersion: 1,
+    status: 'completed',
+    responses: { cancellation: 'propagate-all' },
+    competencyScores: { cancellation: 1 },
+    criticalRisks: [],
+  });
   progress.recommendations.activityIds = ['compiler-nullability'];
   progress.capstone.stage = 'review';
   progress.capstone.version = 1;
