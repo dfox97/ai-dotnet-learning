@@ -52,8 +52,16 @@ test.describe('ReviewLab accessibility regressions', () => {
     await page.keyboard.press('Space');
     await expect(page.getByText('1 line flagged')).toBeVisible();
 
+    const risk = page.getByLabel('Risk for line 1');
+    await risk.focus();
+    await page.keyboard.type('This line weakens the production contract.');
+    const correction = page.getByLabel('Correction for line 1');
+    await correction.focus();
+    await page.keyboard.type('Use an explicit safe contract instead.');
+
     const submit = page.getByRole('button', { name: /Submit review/i });
     await submit.focus();
+    await expect(submit).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByText('REVIEW FEEDBACK')).toBeVisible();
   });
