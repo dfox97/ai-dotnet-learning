@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, Check, Compass, RotateCcw, X } from 'lucide-react';
-import type { DecisionLab as DecisionLabContent } from './content';
+import type { DecisionLab as DecisionLabContent } from './lesson-types';
 import { ensurePracticeStarted, recordPracticeCompleted } from './practice-progress';
 
 type DecisionLabProps = {
