@@ -30,6 +30,10 @@ export type StructuredReviewAttempt = {
   quizAnswer: number | null;
 };
 
+type PersistedStructuredReviewState = ReviewState & {
+  structuredFindings?: StructuredReviewFinding[];
+};
+
 export function migrateLineOnlyReview(
   legacy: ReviewState,
   expectedFindings: Finding[],
@@ -48,6 +52,33 @@ export function migrateLineOnlyReview(
     submitted: legacy.submitted,
     quizAnswer: legacy.quizAnswer,
   };
+}
+
+export function readStructuredReview(
+  review: ReviewState,
+  expectedFindings: Finding[],
+): StructuredReviewAttempt {
+  const persisted = (review as PersistedStructuredReviewState).structuredFindings;
+  if (!persisted) return migrateLineOnlyReview(review, expectedFindings);
+
+  return {
+    findings: persisted.map((finding) => ({ ...finding })),
+    submitted: review.submitted,
+    quizAnswer: review.quizAnswer,
+  };
+}
+
+export function persistStructuredReview(
+  review: ReviewState,
+  attempt: StructuredReviewAttempt,
+): ReviewState {
+  return {
+    ...review,
+    selected: attempt.findings.map(({ line }) => line),
+    submitted: attempt.submitted,
+    quizAnswer: attempt.quizAnswer,
+    structuredFindings: attempt.findings.map((finding) => ({ ...finding })),
+  } as PersistedStructuredReviewState;
 }
 
 export function evaluateStructuredReview(
