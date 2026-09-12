@@ -50,6 +50,19 @@ export function updateReviewFinding(
   };
 }
 
+export function assessReviewFinding(
+  attempt: StructuredReviewAttempt,
+  line: number,
+  reasoningAssessment: StructuredReviewFinding['reasoningAssessment'],
+): StructuredReviewAttempt {
+  return {
+    ...attempt,
+    findings: attempt.findings.map((finding) => (
+      finding.line === line ? { ...finding, reasoningAssessment } : finding
+    )),
+  };
+}
+
 export function removeReviewFinding(
   attempt: StructuredReviewAttempt,
   line: number,
@@ -67,7 +80,6 @@ export function setReviewQuizAnswer(
 ): StructuredReviewAttempt {
   return {
     ...attempt,
-    submitted: false,
     quizAnswer,
   };
 }
