@@ -93,23 +93,71 @@ export type CompetencyChange = {
   delta: number;
 };
 
+export type RemediationVariant = {
+  competencyId: DiagnosticCompetencyId;
+  title: string;
+  guidance: string;
+  activityIds: string[];
+};
+
 export type MasteryAssessment = {
   mastered: boolean;
   overallImprovement: number | null;
   competencyChanges: CompetencyChange[];
   unresolvedCriticalCompetencies: DiagnosticCompetencyId[];
   remediationActivityIds: string[];
+  remediationVariants: RemediationVariant[];
 };
 
-const remediationByCompetency: Record<DiagnosticCompetencyId, string[]> = {
-  nullability: ['compiler-nullability'],
-  cancellation: ['async-reliability', 'automation-production'],
-  'di-lifetime': ['di-composition', 'di-lifetimes'],
-  'async-correctness': ['async-reliability', 'singleton-translation'],
-  'persistence-query': ['data-sql'],
-  idempotency: ['automation-production'],
-  observability: ['readable-architecture'],
-  'tool-authority': ['agentic-dotnet'],
+export const remediationVariants: Record<DiagnosticCompetencyId, RemediationVariant> = {
+  nullability: {
+    competencyId: 'nullability',
+    title: 'Rebuild the nullable contract boundary',
+    guidance: 'Revisit how external optional data becomes a trusted non-null domain value, then review another example before reassessing.',
+    activityIds: ['compiler-nullability'],
+  },
+  cancellation: {
+    competencyId: 'cancellation',
+    title: 'Trace cancellation through every I/O boundary',
+    guidance: 'Follow the stopping token from the worker entry point through delay, SQL and HTTP calls; focus on cooperative shutdown rather than a single cancellation check.',
+    activityIds: ['async-reliability', 'automation-production'],
+  },
+  'di-lifetime': {
+    competencyId: 'di-lifetime',
+    title: 'Recheck hosted-service lifetime boundaries',
+    guidance: 'Contrast singleton worker lifetime with scoped work dependencies and identify where a per-unit-of-work scope must begin and end.',
+    activityIds: ['di-composition', 'di-lifetimes'],
+  },
+  'async-correctness': {
+    competencyId: 'async-correctness',
+    title: 'Make async completion part of the business contract',
+    guidance: 'Revisit awaiting, failure propagation and acknowledgement ordering so side effects complete before the queue message is considered successful.',
+    activityIds: ['async-reliability', 'singleton-translation'],
+  },
+  'persistence-query': {
+    competencyId: 'persistence-query',
+    title: 'Find the server/client query boundary',
+    guidance: 'Trace which operators still translate to SQL and where enumeration moves work into process memory before reviewing another persistence example.',
+    activityIds: ['data-sql'],
+  },
+  idempotency: {
+    competencyId: 'idempotency',
+    title: 'Design for redelivery before retry',
+    guidance: 'Model the crash window around the external side effect and choose a durable logical-job boundary that prevents duplicate business actions.',
+    activityIds: ['automation-production'],
+  },
+  observability: {
+    competencyId: 'observability',
+    title: 'Recover operational evidence',
+    guidance: 'Identify the structured identifiers, outcome, severity and safe failure context an operator needs to understand one failed job.',
+    activityIds: ['readable-architecture'],
+  },
+  'tool-authority': {
+    competencyId: 'tool-authority',
+    title: 'Move authority out of model output',
+    guidance: 'Separate model suggestions from deterministic policy and approval boundaries, especially for consequential or destructive actions.',
+    activityIds: ['agentic-dotnet'],
+  },
 };
 
 export function assessMastery(
@@ -124,8 +172,11 @@ export function assessMastery(
     return { competencyId, baseline: baselineScore, post: postScore, delta: postScore - baselineScore };
   });
   const unresolvedCriticalCompetencies = [...post.criticalRisks];
+  const selectedRemediationVariants = unresolvedCriticalCompetencies.map(
+    (competencyId) => remediationVariants[competencyId],
+  );
   const remediationActivityIds = [...new Set(
-    unresolvedCriticalCompetencies.flatMap((competencyId) => remediationByCompetency[competencyId]),
+    selectedRemediationVariants.flatMap(({ activityIds }) => activityIds),
   )];
   const overallImprovement = baseline.score === null || post.score === null ? null : post.score - baseline.score;
   const mastered = post.complete
@@ -139,5 +190,6 @@ export function assessMastery(
     competencyChanges,
     unresolvedCriticalCompetencies,
     remediationActivityIds,
+    remediationVariants: selectedRemediationVariants,
   };
 }

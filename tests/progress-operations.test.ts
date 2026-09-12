@@ -6,8 +6,10 @@ import {
   setCapstoneProgress,
   setDiagnosticProgress,
   setLessonReview,
+  setPostDiagnosticAttempt,
   setRecommendationProgress,
   setReflection,
+  startPostDiagnosticAttempt,
   startPracticeAttempt,
 } from '../src/progress-operations.ts';
 import { createEmptyProgress } from '../src/progress.ts';
@@ -77,6 +79,44 @@ test('persists diagnostic, recommendation, reflection and capstone domains indep
   assert.deepEqual(progress.recommendations.activityIds, ['data-sql']);
   assert.equal(progress.reflections['async-reliability'], 'Pass the token down every supported boundary.');
   assert.equal(progress.capstone.stage, 'evidence');
+});
+
+test('preserves original post-diagnostic evidence across repeat remediation attempts', () => {
+  const original = {
+    assessmentId: 'post-production-review',
+    assessmentVersion: 1,
+    status: 'completed' as const,
+    responses: { 'post-tool': 'prompt-hard' },
+    competencyScores: { 'tool-authority': 0 },
+    criticalRisks: ['tool-authority'],
+  };
+  const corrected = {
+    assessmentId: 'post-production-review',
+    assessmentVersion: 1,
+    status: 'completed' as const,
+    responses: { 'post-tool': 'policy-boundary' },
+    competencyScores: { 'tool-authority': 1 },
+    criticalRisks: [],
+  };
+
+  let progress = setDiagnosticProgress(createEmptyProgress(), 'post', original);
+  progress = startPostDiagnosticAttempt(progress);
+  progress = setPostDiagnosticAttempt(progress, corrected);
+
+  assert.deepEqual(progress.diagnostics.post, original);
+  assert.deepEqual(progress.diagnostics.postAttempts, [corrected]);
+
+  const next = startPostDiagnosticAttempt(progress);
+  assert.deepEqual(next.diagnostics.post, original);
+  assert.deepEqual(next.diagnostics.postAttempts[0], corrected);
+  assert.equal(next.diagnostics.postAttempts[1].status, 'not-started');
+});
+
+test('cannot start post-diagnostic remediation before original evidence exists', () => {
+  assert.throws(
+    () => startPostDiagnosticAttempt(createEmptyProgress()),
+    /original post-diagnostic is complete/i,
+  );
 });
 
 test('cannot complete a practice activity that has no started attempt', () => {

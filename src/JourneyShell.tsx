@@ -8,7 +8,13 @@ import { baselineDiagnostic } from './baseline-diagnostic';
 import { evaluateCapstoneCriticalCompetencies } from './capstone-journey';
 import { scoreDiagnostic, type DiagnosticCompetencyId, type DiagnosticResult } from './diagnostic-engine';
 import { postDiagnostic, assessMastery } from './post-diagnostic';
-import { setCapstoneProgress, setDiagnosticProgress, setRecommendationProgress } from './progress-operations';
+import {
+  setCapstoneProgress,
+  setDiagnosticProgress,
+  setPostDiagnosticAttempt,
+  setRecommendationProgress,
+  startPostDiagnosticAttempt,
+} from './progress-operations';
 import { loadLearnerProgress, saveLearnerProgress } from './progress-store';
 import type { CapstoneProgress, DiagnosticProgress, LearnerProgress } from './progress';
 import { criticalCompetencies, recommendLearningPath } from './recommendations';
@@ -33,6 +39,10 @@ function storedResult(
     || progress.assessmentVersion !== assessment.version
   ) return null;
   return scoreDiagnostic(assessment, responsesAsStrings(progress));
+}
+
+function latestPostProgress(progress: LearnerProgress): DiagnosticProgress {
+  return progress.diagnostics.postAttempts.at(-1) ?? progress.diagnostics.post;
 }
 
 function completedActivityIds(progress: LearnerProgress): string[] {
@@ -150,7 +160,10 @@ export default function JourneySurface({ pathname }: { pathname: string }) {
   };
 
   const updateDiagnostic = (phase: 'baseline' | 'post', diagnostic: DiagnosticProgress) => {
-    let next = setDiagnosticProgress(progress, phase, diagnostic);
+    const isPostRetry = phase === 'post' && progress.diagnostics.post.status === 'completed';
+    let next = isPostRetry
+      ? setPostDiagnosticAttempt(progress, diagnostic)
+      : setDiagnosticProgress(progress, phase, diagnostic);
 
     if (diagnostic.status === 'completed') {
       const assessment = phase === 'baseline' ? baselineDiagnostic : postDiagnostic;
@@ -180,6 +193,10 @@ export default function JourneySurface({ pathname }: { pathname: string }) {
     }
 
     replaceProgress(next);
+  };
+
+  const startRemediationAttempt = () => {
+    replaceProgress(startPostDiagnosticAttempt(progress));
   };
 
   const updateCapstone = (capstone: CapstoneProgress) => {
@@ -228,28 +245,78 @@ export default function JourneySurface({ pathname }: { pathname: string }) {
 
   if (pathname === `/diagnostics/${postDiagnostic.id}`) {
     const baseline = storedResult(baselineDiagnostic, progress.diagnostics.baseline);
-    const post = storedResult(postDiagnostic, progress.diagnostics.post);
-    const mastery = baseline && post ? assessMastery(baseline, post) : null;
+    const originalPost = storedResult(postDiagnostic, progress.diagnostics.post);
+    const displayedPostProgress = latestPostProgress(progress);
+    const latestPost = storedResult(postDiagnostic, displayedPostProgress) ?? originalPost;
+    const mastery = baseline && latestPost ? assessMastery(baseline, latestPost) : null;
+    const attemptNumber = originalPost ? progress.diagnostics.postAttempts.length + 1 : 1;
+    const canRetry = Boolean(
+      originalPost
+      && mastery
+      && !mastery.mastered
+      && displayedPostProgress.status === 'completed',
+    );
+
     return (
       <main className="main-content">
         <DiagnosticView
           assessment={postDiagnostic}
-          eyebrow="POST-DIAGNOSTIC · MASTERY"
-          progress={progress.diagnostics.post}
+          eyebrow={attemptNumber === 1 ? 'POST-DIAGNOSTIC · MASTERY' : `REMEDIATION CHECK · ATTEMPT ${attemptNumber}`}
+          progress={displayedPostProgress}
           onBack={() => navigate('/')}
           onProgress={(diagnostic) => updateDiagnostic('post', diagnostic)}
         />
         {mastery && (
           <section className="page section-block" aria-live="polite">
             <div className="section-heading compact">
-              <div><p className="eyebrow">MASTERY DECISION</p><h2>{mastery.mastered ? 'Mastery criteria met.' : 'Targeted remediation remains.'}</h2></div>
+              <div>
+                <p className="eyebrow">MASTERY DECISION</p>
+                <h2>{mastery.mastered ? 'Mastery criteria met.' : 'Targeted remediation remains.'}</h2>
+                {progress.diagnostics.postAttempts.length > 0 && <p>Your original post-diagnostic evidence is preserved; this decision uses the latest remediation attempt.</p>}
+              </div>
             </div>
             <div className="concept-grid">
               <article className="concept-card"><h3>{mastery.overallImprovement === null ? 'Not comparable' : `${mastery.overallImprovement >= 0 ? '+' : ''}${Math.round(mastery.overallImprovement * 100)} pp`}</h3><p>Overall change from baseline</p></article>
               <article className="concept-card"><h3>{mastery.unresolvedCriticalCompetencies.length}</h3><p>Unresolved critical competencies</p></article>
               <article className="concept-card"><h3>{mastery.remediationActivityIds.length}</h3><p>Targeted remediation activities</p></article>
             </div>
-            {mastery.remediationActivityIds.length > 0 && <p>Next activities: {mastery.remediationActivityIds.join(', ')}</p>}
+
+            <div className="section-heading compact">
+              <div><p className="eyebrow">COMPETENCY CHANGE</p><h2>Baseline → latest mastery evidence</h2></div>
+            </div>
+            <div className="concept-grid" aria-label="Baseline and post-diagnostic competency comparison">
+              {mastery.competencyChanges.map((change) => (
+                <article className="concept-card" key={change.competencyId}>
+                  <span>{change.competencyId}</span>
+                  <h3>{Math.round(change.baseline * 100)}% → {Math.round(change.post * 100)}%</h3>
+                  <p>{change.delta === 0 ? 'No change' : `${change.delta > 0 ? '+' : ''}${Math.round(change.delta * 100)} percentage points`}</p>
+                </article>
+              ))}
+            </div>
+
+            {mastery.remediationVariants.length > 0 && (
+              <>
+                <div className="section-heading compact">
+                  <div><p className="eyebrow">TARGETED REMEDIATION</p><h2>What to revisit before reassessing</h2></div>
+                </div>
+                <div className="concept-grid" aria-label="Targeted remediation guidance">
+                  {mastery.remediationVariants.map((variant) => (
+                    <article className="concept-card" key={variant.competencyId}>
+                      <span>{variant.competencyId}</span>
+                      <h3>{variant.title}</h3>
+                      <p>{variant.guidance}</p>
+                      <p><strong>Next activity:</strong> {variant.activityIds.join(', ')}</p>
+                    </article>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {canRetry && (
+              <button className="primary-button" type="button" onClick={startRemediationAttempt}>
+                Start remediation attempt <ArrowRight size={16} />
+              </button>
+            )}
           </section>
         )}
       </main>

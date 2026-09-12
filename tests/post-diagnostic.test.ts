@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { baselineDiagnostic } from '../src/baseline-diagnostic.ts';
 import { scoreDiagnostic } from '../src/diagnostic-engine.ts';
-import { assessMastery, postDiagnostic } from '../src/post-diagnostic.ts';
+import { assessMastery, postDiagnostic, remediationVariants } from '../src/post-diagnostic.ts';
 
 function responses(assessment: typeof baselineDiagnostic, wrongCompetency?: string) {
   return Object.fromEntries(assessment.questions.map((question) => {
@@ -13,13 +13,19 @@ function responses(assessment: typeof baselineDiagnostic, wrongCompetency?: stri
   }));
 }
 
-test('post assessment is separately authored but competency-equivalent', () => {
+test('post assessment is separately authored but rubric-equivalent', () => {
   assert.notEqual(postDiagnostic.id, baselineDiagnostic.id);
   assert.notEqual(postDiagnostic.scenario, baselineDiagnostic.scenario);
+  assert.equal(postDiagnostic.questions.length, baselineDiagnostic.questions.length);
 
-  const baselineCompetencies = baselineDiagnostic.questions.map((question) => question.competencyId).sort();
-  const postCompetencies = postDiagnostic.questions.map((question) => question.competencyId).sort();
-  assert.deepEqual(postCompetencies, baselineCompetencies);
+  const rubric = (assessment: typeof baselineDiagnostic) => assessment.questions
+    .map(({ competencyId, critical }) => ({ competencyId, critical }))
+    .sort((left, right) => left.competencyId.localeCompare(right.competencyId));
+
+  assert.deepEqual(
+    rubric(postDiagnostic as typeof baselineDiagnostic),
+    rubric(baselineDiagnostic),
+  );
 });
 
 test('awards mastery when the post score passes and no critical risk remains', () => {
@@ -30,6 +36,7 @@ test('awards mastery when the post score passes and no critical risk remains', (
   assert.equal(mastery.mastered, true);
   assert.ok((mastery.overallImprovement ?? 0) > 0);
   assert.deepEqual(mastery.unresolvedCriticalCompetencies, []);
+  assert.deepEqual(mastery.remediationVariants, []);
 });
 
 test('blocks mastery when a critical competency is unresolved despite a passing overall score', () => {
@@ -41,6 +48,23 @@ test('blocks mastery when a critical competency is unresolved despite a passing 
   assert.equal(mastery.mastered, false);
   assert.deepEqual(mastery.unresolvedCriticalCompetencies, ['tool-authority']);
   assert.deepEqual(mastery.remediationActivityIds, ['agentic-dotnet']);
+  assert.deepEqual(mastery.remediationVariants, [remediationVariants['tool-authority']]);
+  assert.match(mastery.remediationVariants[0].guidance, /deterministic policy/i);
+});
+
+test('compares baseline and post evidence by competency and overall score', () => {
+  const baseline = scoreDiagnostic(baselineDiagnostic, responses(baselineDiagnostic, 'observability'));
+  const post = scoreDiagnostic(postDiagnostic, responses(postDiagnostic as typeof baselineDiagnostic));
+  const mastery = assessMastery(baseline, post);
+  const observability = mastery.competencyChanges.find(({ competencyId }) => competencyId === 'observability');
+
+  assert.deepEqual(observability, {
+    competencyId: 'observability',
+    baseline: 0,
+    post: 1,
+    delta: 1,
+  });
+  assert.equal(mastery.overallImprovement, 0.125);
 });
 
 test('does not award mastery for an interrupted post assessment', () => {
@@ -54,4 +78,17 @@ test('does not award mastery for an interrupted post assessment', () => {
   assert.equal(post.score, null);
   assert.equal(mastery.mastered, false);
   assert.equal(mastery.overallImprovement, null);
+});
+
+test('every critical competency has authored remediation copy and a next activity', () => {
+  const criticalCompetencies = postDiagnostic.questions
+    .filter((question) => question.critical)
+    .map((question) => question.competencyId);
+
+  for (const competencyId of criticalCompetencies) {
+    const variant = remediationVariants[competencyId];
+    assert.ok(variant.title.trim());
+    assert.ok(variant.guidance.trim());
+    assert.ok(variant.activityIds.length > 0);
+  }
 });

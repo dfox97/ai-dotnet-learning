@@ -1,10 +1,11 @@
-import type {
-  ActivityAttempt,
-  CapstoneProgress,
-  DiagnosticProgress,
-  LearnerProgress,
-  RecommendationProgress,
-  ReviewState,
+import {
+  createEmptyDiagnostic,
+  type ActivityAttempt,
+  type CapstoneProgress,
+  type DiagnosticProgress,
+  type LearnerProgress,
+  type RecommendationProgress,
+  type ReviewState,
 } from './progress.ts';
 
 export type PracticeArea = keyof LearnerProgress['practice'];
@@ -137,6 +138,48 @@ export function setDiagnosticProgress(
   return {
     ...progress,
     diagnostics: { ...progress.diagnostics, [phase]: diagnostic },
+  };
+}
+
+export function startPostDiagnosticAttempt(progress: LearnerProgress): LearnerProgress {
+  if (progress.diagnostics.post.status !== 'completed') {
+    throw new Error('Cannot start post-diagnostic remediation before the original post-diagnostic is complete.');
+  }
+
+  const current = progress.diagnostics.postAttempts.at(-1);
+  if (current && current.status !== 'completed') return progress;
+
+  return {
+    ...progress,
+    diagnostics: {
+      ...progress.diagnostics,
+      postAttempts: [...progress.diagnostics.postAttempts, createEmptyDiagnostic()],
+    },
+  };
+}
+
+export function setPostDiagnosticAttempt(
+  progress: LearnerProgress,
+  diagnostic: DiagnosticProgress,
+): LearnerProgress {
+  if (progress.diagnostics.post.status !== 'completed') {
+    return setDiagnosticProgress(progress, 'post', diagnostic);
+  }
+
+  const attempts = progress.diagnostics.postAttempts;
+  if (attempts.length === 0) {
+    return {
+      ...progress,
+      diagnostics: { ...progress.diagnostics, postAttempts: [diagnostic] },
+    };
+  }
+
+  return {
+    ...progress,
+    diagnostics: {
+      ...progress.diagnostics,
+      postAttempts: [...attempts.slice(0, -1), diagnostic],
+    },
   };
 }
 
