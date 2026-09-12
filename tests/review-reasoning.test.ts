@@ -7,7 +7,10 @@ import {
   objectiveReviewScore,
   type StructuredReviewAttempt,
 } from '../src/review-reasoning.ts';
-import { buildReviewReasoningRubric } from '../src/review-rubric.ts';
+import {
+  buildReviewReasoningRubric,
+  buildReviewReasoningRubrics,
+} from '../src/review-rubric.ts';
 
 const expected: Finding[] = [
   {
@@ -98,4 +101,12 @@ test('exposes the authored production concern as a transparent self-assessment r
     riskCriterion: 'The caller token is not propagated through I/O.',
     correctionCriterion: 'Pass the token to supported async operations.',
   });
+});
+
+test('indexes authored rubrics by source line for learner feedback', () => {
+  const rubrics = buildReviewReasoningRubrics(expected);
+
+  assert.deepEqual(Object.keys(rubrics), ['3', '7']);
+  assert.equal(rubrics[3].expectedSeverity, 'blocker');
+  assert.equal(rubrics[7].correctionCriterion, 'Record a structured outcome with the job id.');
 });
