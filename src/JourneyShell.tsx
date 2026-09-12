@@ -281,17 +281,35 @@ export default function JourneySurface({ pathname }: { pathname: string }) {
               <article className="concept-card"><h3>{mastery.remediationActivityIds.length}</h3><p>Targeted remediation activities</p></article>
             </div>
 
+            <div className="section-heading compact">
+              <div><p className="eyebrow">COMPETENCY CHANGE</p><h2>Baseline → latest mastery evidence</h2></div>
+            </div>
+            <div className="concept-grid" aria-label="Baseline and post-diagnostic competency comparison">
+              {mastery.competencyChanges.map((change) => (
+                <article className="concept-card" key={change.competencyId}>
+                  <span>{change.competencyId}</span>
+                  <h3>{Math.round(change.baseline * 100)}% → {Math.round(change.post * 100)}%</h3>
+                  <p>{change.delta === 0 ? 'No change' : `${change.delta > 0 ? '+' : ''}${Math.round(change.delta * 100)} percentage points`}</p>
+                </article>
+              ))}
+            </div>
+
             {mastery.remediationVariants.length > 0 && (
-              <div className="concept-grid" aria-label="Targeted remediation guidance">
-                {mastery.remediationVariants.map((variant) => (
-                  <article className="concept-card" key={variant.competencyId}>
-                    <span>{variant.competencyId}</span>
-                    <h3>{variant.title}</h3>
-                    <p>{variant.guidance}</p>
-                    <p><strong>Next activity:</strong> {variant.activityIds.join(', ')}</p>
-                  </article>
-                ))}
-              </div>
+              <>
+                <div className="section-heading compact">
+                  <div><p className="eyebrow">TARGETED REMEDIATION</p><h2>What to revisit before reassessing</h2></div>
+                </div>
+                <div className="concept-grid" aria-label="Targeted remediation guidance">
+                  {mastery.remediationVariants.map((variant) => (
+                    <article className="concept-card" key={variant.competencyId}>
+                      <span>{variant.competencyId}</span>
+                      <h3>{variant.title}</h3>
+                      <p>{variant.guidance}</p>
+                      <p><strong>Next activity:</strong> {variant.activityIds.join(', ')}</p>
+                    </article>
+                  ))}
+                </div>
+              </>
             )}
 
             {canRetry && (
