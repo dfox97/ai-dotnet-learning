@@ -3,7 +3,7 @@ import {
   translationChallenges as authoredTranslationChallenges,
   type BridgePattern,
   type TranslationChallenge,
-} from './patterns.ts';
+} from './authored-practice.ts';
 import {
   resourceCategories,
   resources as authoredResources,
