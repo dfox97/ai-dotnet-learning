@@ -19,19 +19,18 @@ export function addReviewFinding(
 ): StructuredReviewAttempt {
   if (attempt.findings.some((finding) => finding.line === line)) return attempt;
 
+  const newFinding: StructuredReviewFinding = {
+    line,
+    severity,
+    risk: '',
+    correction: '',
+    reasoningAssessment: 'not-assessed',
+  };
+
   return {
     ...attempt,
     submitted: false,
-    findings: [
-      ...attempt.findings,
-      {
-        line,
-        severity,
-        risk: '',
-        correction: '',
-        reasoningAssessment: 'not-assessed',
-      },
-    ].sort((left, right) => left.line - right.line),
+    findings: [...attempt.findings, newFinding].sort((left, right) => left.line - right.line),
   };
 }
 
