@@ -1,4 +1,4 @@
-import type { Finding } from './content.ts';
+import type { Finding } from './lesson-types.ts';
 
 export type ReviewReasoningRubric = {
   line: number;
