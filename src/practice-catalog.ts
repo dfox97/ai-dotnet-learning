@@ -57,6 +57,7 @@ export function validatePracticeAndReferenceCatalog(
   for (const pattern of catalog.bridgePatterns) {
     requireCopy(pattern.title, `bridge pattern "${pattern.id}" title`, issues);
     requireCopy(pattern.summary, `bridge pattern "${pattern.id}" summary`, issues);
+    requireCopy(pattern.category, `bridge pattern "${pattern.id}" category`, issues);
     duplicateValues(pattern.concepts.map(({ id }) => id), `bridge pattern "${pattern.id}" concepts`, issues);
 
     const typeScriptLines = lineCount(pattern.typeScript.code);
@@ -81,7 +82,16 @@ export function validatePracticeAndReferenceCatalog(
   for (const challenge of catalog.translationChallenges) {
     requireCopy(challenge.title, `translation challenge "${challenge.id}" title`, issues);
     requireCopy(challenge.brief, `translation challenge "${challenge.id}" brief`, issues);
+    requireCopy(challenge.category, `translation challenge "${challenge.id}" category`, issues);
     requireCopy(challenge.idiomaticCode, `translation challenge "${challenge.id}" idiomatic solution`, issues);
+    if (challenge.idiomaticNotes.length === 0) {
+      issues.push(`translation challenge "${challenge.id}" must include idiomatic notes`);
+    } else {
+      challenge.idiomaticNotes.forEach((note, index) => {
+        requireCopy(note, `translation challenge "${challenge.id}" idiomatic note ${index + 1}`, issues);
+      });
+    }
+
     const generatedLines = lineCount(challenge.generatedCode);
     for (const finding of challenge.findings) {
       if (!Number.isInteger(finding.line) || finding.line < 1 || finding.line > generatedLines) {
