@@ -1,5 +1,5 @@
 export const PROGRESS_STORAGE_KEY = 'reviewlab-progress';
-export const PROGRESS_VERSION = 4 as const;
+export const PROGRESS_VERSION = 5 as const;
 
 export type ReviewState = {
   selected: number[];
@@ -60,6 +60,7 @@ export type LearnerProgress = {
   diagnostics: {
     baseline: DiagnosticProgress;
     post: DiagnosticProgress;
+    postAttempts: DiagnosticProgress[];
   };
   recommendations: RecommendationProgress;
   reflections: Record<string, string>;
@@ -87,7 +88,7 @@ type VersionTwoProgress = {
     reviews: Record<string, ReviewState>;
   };
   practice?: LearnerProgress['practice'];
-  diagnostics?: LearnerProgress['diagnostics'];
+  diagnostics?: Pick<LearnerProgress['diagnostics'], 'baseline' | 'post'>;
   recommendations?: RecommendationProgress;
   reflections?: Record<string, string>;
   capstone?: Omit<CapstoneProgress, 'mastery'>;
@@ -97,10 +98,20 @@ type VersionThreeProgress = {
   version: 3;
   lessons: LearnerProgress['lessons'];
   practice?: LearnerProgress['practice'];
-  diagnostics?: LearnerProgress['diagnostics'];
+  diagnostics?: Pick<LearnerProgress['diagnostics'], 'baseline' | 'post'>;
   recommendations?: RecommendationProgress;
   reflections?: Record<string, string>;
   capstone?: Omit<CapstoneProgress, 'mastery'>;
+};
+
+type VersionFourProgress = {
+  version: 4;
+  lessons: LearnerProgress['lessons'];
+  practice: LearnerProgress['practice'];
+  diagnostics: Pick<LearnerProgress['diagnostics'], 'baseline' | 'post'>;
+  recommendations: RecommendationProgress;
+  reflections: Record<string, string>;
+  capstone: CapstoneProgress;
 };
 
 export type ProgressLoadResult =
@@ -109,7 +120,7 @@ export type ProgressLoadResult =
   | { status: 'migrated'; progress: LearnerProgress }
   | { status: 'recovery-required'; progress: LearnerProgress; reason: string };
 
-function createEmptyDiagnostic(): DiagnosticProgress {
+export function createEmptyDiagnostic(): DiagnosticProgress {
   return {
     assessmentId: null,
     assessmentVersion: null,
@@ -133,7 +144,7 @@ export function createEmptyProgress(): LearnerProgress {
     version: PROGRESS_VERSION,
     lessons: { completed: [], reviews: {}, attempts: {} },
     practice: { patternBridge: {}, translationReview: {}, decisionLabs: {} },
-    diagnostics: { baseline: createEmptyDiagnostic(), post: createEmptyDiagnostic() },
+    diagnostics: { baseline: createEmptyDiagnostic(), post: createEmptyDiagnostic(), postAttempts: [] },
     recommendations: { activityIds: [], masteredCompetencyIds: [], atRiskCompetencyIds: [] },
     reflections: {},
     capstone: {
@@ -219,7 +230,11 @@ function hydratePreMasteryProgress(previous: VersionTwoProgress | VersionThreePr
   return hydrateProgress({
     lessons,
     practice: previous.practice ?? empty.practice,
-    diagnostics: previous.diagnostics ?? empty.diagnostics,
+    diagnostics: {
+      ...empty.diagnostics,
+      ...(previous.diagnostics ?? {}),
+      postAttempts: [],
+    },
     recommendations: previous.recommendations ?? empty.recommendations,
     reflections: previous.reflections ?? empty.reflections,
     capstone: previous.capstone
@@ -234,6 +249,17 @@ export function migrateVersionTwoProgress(previous: VersionTwoProgress): Learner
 
 export function migrateVersionThreeProgress(previous: VersionThreeProgress): LearnerProgress {
   return hydratePreMasteryProgress(previous);
+}
+
+export function migrateVersionFourProgress(previous: VersionFourProgress): LearnerProgress {
+  return hydrateProgress({
+    lessons: previous.lessons,
+    practice: previous.practice,
+    diagnostics: { ...previous.diagnostics, postAttempts: [] },
+    recommendations: previous.recommendations,
+    reflections: previous.reflections,
+    capstone: previous.capstone,
+  });
 }
 
 export function parseProgress(raw: string | null): ProgressLoadResult {
@@ -263,6 +289,13 @@ export function parseProgress(raw: string | null): ProgressLoadResult {
     return {
       status: 'loaded',
       progress: hydrateProgress(stored as Partial<LearnerProgress>),
+    };
+  }
+
+  if (stored.version === 4) {
+    return {
+      status: 'migrated',
+      progress: migrateVersionFourProgress(stored as VersionFourProgress),
     };
   }
 
