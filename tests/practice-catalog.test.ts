@@ -49,6 +49,22 @@ test('rejects translation findings outside generated code', () => {
   );
 });
 
+test('requires authored categories and idiomatic notes', () => {
+  const pattern = { ...bridgePatterns[0], category: '' };
+  const challenge = { ...translationChallenges[0], idiomaticNotes: [] };
+
+  assert.throws(
+    () => validatePracticeAndReferenceCatalog({
+      bridgePatterns: [pattern],
+      translationChallenges: [challenge],
+      resources,
+    }),
+    (error: unknown) => error instanceof PracticeCatalogValidationError
+      && error.issues.some((issue) => issue.includes('category must contain authored copy'))
+      && error.issues.some((issue) => issue.includes('must include idiomatic notes')),
+  );
+});
+
 test('rejects unsafe or malformed resource URLs', () => {
   const broken = { ...resources[0], url: 'http://example.test/guide' };
 
