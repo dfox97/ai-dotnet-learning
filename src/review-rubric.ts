@@ -7,6 +7,8 @@ export type ReviewReasoningRubric = {
   correctionCriterion: string;
 };
 
+export type ReviewReasoningRubricMap = Record<number, ReviewReasoningRubric>;
+
 export function buildReviewReasoningRubric(finding: Finding): ReviewReasoningRubric {
   return {
     line: finding.line,
@@ -14,4 +16,10 @@ export function buildReviewReasoningRubric(finding: Finding): ReviewReasoningRub
     riskCriterion: finding.explanation,
     correctionCriterion: finding.better,
   };
+}
+
+export function buildReviewReasoningRubrics(findings: Finding[]): ReviewReasoningRubricMap {
+  return Object.fromEntries(
+    findings.map((finding) => [finding.line, buildReviewReasoningRubric(finding)]),
+  );
 }
