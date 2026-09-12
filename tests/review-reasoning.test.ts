@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { Finding } from '../src/content.ts';
+import type { Finding } from '../src/lesson-types.ts';
 import {
   evaluateStructuredReview,
   migrateLineOnlyReview,
