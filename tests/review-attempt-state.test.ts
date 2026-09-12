@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   addReviewFinding,
+  assessReviewFinding,
   createStructuredReviewAttempt,
   removeReviewFinding,
   setReviewQuizAnswer,
@@ -42,11 +43,23 @@ test('keeps findings unique, sorted and editable before resubmission', () => {
 
 test('supports removing findings and changing quiz answers without mutating prior state', () => {
   const original = addReviewFinding(createStructuredReviewAttempt(), 5);
-  const answered = setReviewQuizAnswer(original, 2);
+  const submitted = submitStructuredReviewAttempt(original);
+  const answered = setReviewQuizAnswer(submitted, 2);
   const removed = removeReviewFinding(answered, 5);
 
   assert.equal(original.quizAnswer, null);
   assert.equal(original.findings.length, 1);
   assert.equal(answered.quizAnswer, 2);
+  assert.equal(answered.submitted, true);
   assert.equal(removed.findings.length, 0);
+});
+
+test('records rubric self-assessment without reopening a submitted review', () => {
+  const selected = addReviewFinding(createStructuredReviewAttempt(), 7, 'warning');
+  const submitted = submitStructuredReviewAttempt(selected);
+  const assessed = assessReviewFinding(submitted, 7, 'meets');
+
+  assert.equal(assessed.submitted, true);
+  assert.equal(assessed.findings[0].reasoningAssessment, 'meets');
+  assert.equal(submitted.findings[0].reasoningAssessment, 'not-assessed');
 });
