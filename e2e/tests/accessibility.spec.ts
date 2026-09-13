@@ -18,13 +18,16 @@ async function expectNoUnnamedInteractiveControls(page: import('@playwright/test
   expect(unnamed).toEqual([]);
 }
 
+async function expectAccessibleSurface(page: import('@playwright/test').Page, path: string) {
+  await page.goto(path);
+  await expect(page.locator('main')).toHaveCount(1);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expectNoUnnamedInteractiveControls(page);
+}
+
 test.describe('ReviewLab accessibility regressions', () => {
   test('dashboard exposes semantic structure and named controls', async ({ page }) => {
-    await page.goto('/');
-
-    await expect(page.locator('main')).toHaveCount(1);
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expectNoUnnamedInteractiveControls(page);
+    await expectAccessibleSurface(page, '/');
 
     const duplicateIds = await page.locator('[id]').evaluateAll((elements) => {
       const counts = new Map<string, number>();
@@ -35,6 +38,17 @@ test.describe('ReviewLab accessibility regressions', () => {
       return [...counts.entries()].filter(([, count]) => count > 1);
     });
     expect(duplicateIds).toEqual([]);
+  });
+
+  test('diagnostic, practice, report and capstone surfaces expose named controls and headings', async ({ page }) => {
+    for (const path of [
+      '/diagnostics/baseline-production-review',
+      '/practice/di-lifetimes',
+      '/report',
+      '/capstone',
+    ]) {
+      await expectAccessibleSurface(page, path);
+    }
   });
 
   test('primary learning journey works from the keyboard', async ({ page }) => {
@@ -79,6 +93,34 @@ test.describe('ReviewLab accessibility regressions', () => {
       }));
       expect(active.tag).not.toBe('BODY');
       expect(active.visible).toBe(true);
+    }
+  });
+
+  test('focus-visible treatment is present for keyboard users', async ({ page }) => {
+    await page.goto('/');
+    const start = page.getByRole('button', { name: /Start first review/i });
+    await start.focus();
+
+    const focusStyle = await start.evaluate((element) => {
+      const styles = getComputedStyle(element);
+      return { outlineStyle: styles.outlineStyle, outlineWidth: styles.outlineWidth };
+    });
+
+    expect(focusStyle.outlineStyle).not.toBe('none');
+    expect(Number.parseFloat(focusStyle.outlineWidth)).toBeGreaterThanOrEqual(2);
+  });
+
+  test('small-screen educational surfaces remain readable without page-level horizontal overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    for (const path of ['/', '/diagnostics/baseline-production-review', '/report', '/capstone']) {
+      await page.goto(path);
+      const dimensions = await page.evaluate(() => ({
+        viewport: document.documentElement.clientWidth,
+        page: document.documentElement.scrollWidth,
+      }));
+      expect(dimensions.page).toBeLessThanOrEqual(dimensions.viewport + 1);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     }
   });
 
