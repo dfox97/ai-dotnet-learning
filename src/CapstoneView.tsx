@@ -20,9 +20,19 @@ const generateCommand = 'node scripts/generate-capstone.ts --output ../reviewlab
 const testCommand = 'dotnet test ReviewLab.Capstone.Tests/ReviewLab.Capstone.Tests.csproj';
 const expertCommand = 'node scripts/generate-capstone.ts --output ../reviewlab-capstone-expert --variant expert';
 
+const expertFindings = [
+  'The worker must propagate cancellation through supported SQL, HTTP, and automation boundaries.',
+  'The hosted service must not hold scoped work dependencies for the lifetime of the singleton host.',
+  'Redelivery must not repeat a consequential external action; use durable idempotency tied to the logical job.',
+  'Consequential tool authority must sit behind deterministic policy rather than model output alone.',
+  'Operational evidence must record a structured outcome with stable correlation identifiers.',
+];
+
 export default function CapstoneView({ progress, onBack, onProgress }: CapstoneViewProps) {
   const stage = resumeCapstoneStage(progress);
-  const [finding, setFinding] = useState(Object.values(progress.findings)[0] ?? '');
+  const [risk, setRisk] = useState(progress.findings.risk ?? Object.values(progress.findings)[0] ?? '');
+  const [impact, setImpact] = useState(progress.findings.impact ?? '');
+  const [correction, setCorrection] = useState(progress.findings.correction ?? '');
   const [testEvidence, setTestEvidence] = useState(progress.testEvidence.join('\n'));
   const [reflection, setReflection] = useState(progress.reflection);
   const evidenceEntries = useMemo(
@@ -31,9 +41,10 @@ export default function CapstoneView({ progress, onBack, onProgress }: CapstoneV
   );
 
   const begin = () => onProgress(startCapstone(progress));
-  const submitReview = () => onProgress(recordCapstoneFindings(progress, { 'learner-review': finding }));
+  const submitReview = () => onProgress(recordCapstoneFindings(progress, { risk, impact, correction }));
   const markRepaired = () => onProgress(markCapstoneRepairReady(progress));
   const finish = () => onProgress(completeCapstone(progress, evidenceEntries, reflection));
+  const reviewComplete = risk.trim() && impact.trim() && correction.trim();
 
   return (
     <div className="page capstone-page">
@@ -48,19 +59,34 @@ export default function CapstoneView({ progress, onBack, onProgress }: CapstoneV
         <div className="header-chip"><span className="status-dot" /> Stage: {stage}</div>
       </header>
 
+      <section className="section-block" aria-labelledby="capstone-overview-title">
+        <div className="section-heading compact">
+          <div>
+            <p className="eyebrow">CAPSTONE OVERVIEW</p>
+            <h2 id="capstone-overview-title">Plan for a focused 60–90 minute local repair</h2>
+            <p>Prerequisites: complete the baseline and learning path first, then use a desktop environment with Git, Node.js and the .NET 8 SDK available.</p>
+          </div>
+        </div>
+        <div className="concept-grid">
+          <article className="concept-card"><span>01</span><h3>Generate</h3><p>Create the disposable starter workspace from the repository script.</p></article>
+          <article className="concept-card"><span>02</span><h3>Review & repair</h3><p>Inspect multiple files, record your reasoning, make local edits, and rerun the behavioural tests.</p></article>
+          <article className="concept-card"><span>03</span><h3>Prove & reflect</h3><p>Record the actual terminal result and what changed in your production judgement.</p></article>
+        </div>
+      </section>
+
       <section className="section-block">
         <div className="section-heading compact"><div><p className="eyebrow">LOCAL WORKSPACE</p><h2>Generate the disposable learner project</h2></div></div>
         <article className="quiz-card">
           <p>The starter deliberately contains production defects. Its initial test run is expected to fail.</p>
           <pre><code>{generateCommand}{'\n'}cd ../reviewlab-capstone{'\n'}{testCommand}</code></pre>
-          <p>Requires a desktop/local environment with the .NET 8 SDK. ReviewLab itself does not execute these commands.</p>
+          <p>Requires a desktop/local environment with the .NET 8 SDK. ReviewLab itself does not execute these commands or infer their result.</p>
         </article>
       </section>
 
       {stage === 'not-started' && (
         <section className="bridge-banner">
           <div className="bridge-icon"><Play size={23} /></div>
-          <div><p className="overline dark">READY WHEN YOU ARE</p><h2>Start with your own review.</h2><p>Expert comparison stays hidden until you submit at least one finding.</p></div>
+          <div><p className="overline dark">READY WHEN YOU ARE</p><h2>Start with your own review.</h2><p>Expert findings and the reference repair stay hidden until you explicitly submit your own structured review.</p></div>
           <button className="primary-button" onClick={begin}>Start capstone</button>
         </section>
       )}
@@ -68,20 +94,24 @@ export default function CapstoneView({ progress, onBack, onProgress }: CapstoneV
       {stage === 'review' && (
         <section className="review-section">
           <div className="section-heading compact"><div><p className="eyebrow">01 · REVIEW</p><h2>Record your production findings</h2><p>Inspect the generated worker, composition root and failing tests before changing code.</p></div></div>
-          <label htmlFor="capstone-findings">Your findings</label>
-          <textarea
-            id="capstone-findings"
-            value={finding}
-            onChange={(event) => setFinding(event.target.value)}
-            placeholder="What is risky, why does it matter in production, and what should change?"
-          />
-          <button className="primary-button" disabled={!finding.trim()} onClick={submitReview}>Submit review</button>
+          <label htmlFor="capstone-risk">Production risk</label>
+          <textarea id="capstone-risk" value={risk} onChange={(event) => setRisk(event.target.value)} placeholder="What specific behaviour or boundary is unsafe?" />
+          <label htmlFor="capstone-impact">Why it matters</label>
+          <textarea id="capstone-impact" value={impact} onChange={(event) => setImpact(event.target.value)} placeholder="What failure mode or production consequence could result?" />
+          <label htmlFor="capstone-correction">Proposed correction</label>
+          <textarea id="capstone-correction" value={correction} onChange={(event) => setCorrection(event.target.value)} placeholder="What safer design or implementation would you ask for?" />
+          <button className="primary-button" disabled={!reviewComplete} onClick={submitReview}>Submit structured review</button>
         </section>
       )}
 
       {canRevealExpertAnswer(progress) && (
         <section className="section-block">
-          <div className="section-heading compact"><div><p className="eyebrow">EXPERT COMPARISON UNLOCKED</p><h2>Compare only after your own review</h2></div></div>
+          <div className="section-heading compact"><div><p className="eyebrow">EXPERT COMPARISON UNLOCKED</p><h2>Compare only after your own review</h2><p>Your original findings remain stored as learner evidence.</p></div></div>
+          <div className="concept-grid" aria-label="Expert capstone findings">
+            {expertFindings.map((finding, index) => (
+              <article className="concept-card" key={finding}><span>{String(index + 1).padStart(2, '0')}</span><p>{finding}</p></article>
+            ))}
+          </div>
           <aside className="compiler-callout">
             <div className="callout-icon"><Code2 size={23} /></div>
             <div>
