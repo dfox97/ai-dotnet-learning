@@ -1,3 +1,20 @@
+.personal-alpha-notice {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid currentColor;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.personal-alpha-notice strong {
+  white-space: nowrap;
+}
+
 .journey-launchpad-host {
   position: relative;
   z-index: 2;
@@ -12,6 +29,12 @@
 }
 
 @media (max-width: 900px) {
+  .personal-alpha-notice {
+    align-items: center;
+    flex-direction: column;
+    gap: 2px;
+  }
+
   .journey-launchpad-host {
     margin-left: 0;
     padding: 72px 16px 0;
