@@ -31,8 +31,10 @@ import ProgressTransferControls from './ProgressTransferControls';
 import ResourcesView from './ResourcesView';
 import StructuredLessonView from './StructuredLessonView';
 import TranslationReviewView from './TranslationReviewView';
-import { glossary, lessons, type Lesson } from './content';
-import { bridgePatterns, translationChallenges } from './patterns';
+import { glossary } from './glossary-catalog';
+import { lessons } from './lesson-catalog';
+import type { Lesson } from './lesson-types';
+import { bridgePatterns, translationChallenges } from './practice-catalog';
 import {
   createWindowNavigationHistory,
   navigateToLearningLocation,
