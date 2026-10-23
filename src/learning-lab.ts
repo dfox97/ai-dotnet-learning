@@ -1,10 +1,11 @@
-export type LabQuestion = { id: string; kind: string; prompt: string; code: string; options: string[]; hint: string; bridge: string; practiceReference?: string; reviewCriteria?: string[] };
-export type LabAttempt = { id: string; questionId: string; answer: string; score: number | null; feedback: string; source: string; at: string };
+export type LabQuestion = { id: string; kind: string; prompt: string; code: string; options: string[]; hint: string; bridge: string; conceptId?: string; difficulty?: string; generated?: boolean; practiceReference?: string; reviewCriteria?: string[] };
+export type LabAttempt = { id: string; questionId: string; answer: string; score: number | null; feedback: string; source: string; at: string; conceptId?: string };
+export type AdaptiveSession = { id: string; createdAt: string; rationale: string; questions: LabQuestion[] };
 const day = 86_400_000;
 export function topicStatus(questions: LabQuestion[], attempts: LabAttempt[], now = Date.now()) {
-  const latest = questions.map(q => attempts.filter(a => a.questionId === q.id).at(-1));
+  const latest = questions.map(q => attempts.filter(a => (a.conceptId ?? a.questionId) === (q.conceptId ?? q.id)).at(-1));
   const mastered = questions.length > 0 && questions.every(q => {
-    const recent = attempts.filter(a => a.questionId === q.id).slice(-2);
+    const recent = attempts.filter(a => (a.conceptId ?? a.questionId) === (q.conceptId ?? q.id)).slice(-2);
     return recent.length === 2 && recent.every(a => a.score !== null && a.score >= 80) && recent[0].at.slice(0, 10) !== recent[1].at.slice(0, 10);
   });
   const due = questions.filter((_, i) => !latest[i] || Date.parse(latest[i]!.at) + (latest[i]!.score === null || latest[i]!.score! < 80 ? day : 3 * day) <= now);

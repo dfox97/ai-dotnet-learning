@@ -11,3 +11,5 @@ e2e/test-results/
 server/bin/
 server/obj/
 server/progress/
+server.Tests/bin/
+server.Tests/obj/

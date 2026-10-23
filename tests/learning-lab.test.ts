@@ -42,3 +42,10 @@ test('a due question takes priority over a lower score that is not yet due', () 
   const history = [attempt('copy', 100, '2026-10-19T10:00:00Z'), attempt('struct', 0, '2026-10-23T10:00:00Z')];
   assert.equal(nextQuestion(questions, history, [], now)?.id, 'copy');
 });
+test('fresh generated questions contribute to their underlying concept rather than new mastery buckets', () => {
+  const history = [attempt('copy', 100, '2026-10-22T10:00:00Z'), { ...attempt('generated-copy', 20, '2026-10-23T10:00:00Z'), conceptId: 'copy' }];
+  const status = topicStatus(questions, history, Date.parse('2026-10-23T12:00:00Z'));
+  assert.equal(status.answered, 1);
+  assert.equal(status.average, 20);
+  assert.equal(status.mastered, false);
+});

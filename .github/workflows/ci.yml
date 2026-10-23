@@ -22,6 +22,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run validate:content
+      - name: Verify adaptive learning backend
+        run: dotnet test server.Tests/LearningLab.Tests.csproj --configuration Release
       - name: Verify starter capstone exposes repair work
         run: |
           node scripts/generate-capstone.ts --output .tmp/capstone-starter
