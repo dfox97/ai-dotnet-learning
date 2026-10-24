@@ -1,4 +1,5 @@
 import JourneySurface, { JourneyLaunchpad } from './JourneyShell';
+import LearningLab from './LearningLab';
 import WorkspaceApp from './WorkspaceApp';
 import { stripDeploymentBasePath } from './base-path';
 import './journey-shell.css';
@@ -19,6 +20,8 @@ function PersonalAlphaNotice() {
 export default function App() {
   const pathname = stripDeploymentBasePath(window.location.pathname, import.meta.env.BASE_URL) ?? '/';
 
+  if (pathname === '/learning-lab') return <LearningLab />;
+
   if (isJourneyPath(pathname)) {
     return (
       <>
@@ -31,6 +34,7 @@ export default function App() {
   return (
     <>
       <PersonalAlphaNotice />
+      <div className="journey-launchpad-host"><section className="page"><a className="primary-button" href={`${import.meta.env.BASE_URL}learning-lab`}>Open DotNet Learning Lab →</a></section></div>
       {pathname === '/' && <div className="journey-launchpad-host"><JourneyLaunchpad /></div>}
       <WorkspaceApp />
     </>

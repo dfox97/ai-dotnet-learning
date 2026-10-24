@@ -4,4 +4,5 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => ({
   base: mode === 'pages' ? '/ai-dotnet-learning/' : '/',
   plugins: [react()],
+  server: { proxy: { '/api/lab': 'http://127.0.0.1:5050' } },
 }));
