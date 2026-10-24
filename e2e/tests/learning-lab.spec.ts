@@ -1,14 +1,19 @@
 import { test, expect } from '@playwright/test';
 
+const maxSessionQuestions = 10;
+
 test('Lab grades a session, preserves Markdown evidence, and handles unconfigured AI honestly', async ({ page, request }) => {
   test.skip(!process.env.LAB_E2E, 'Requires the local ASP.NET learning server.');
   await page.goto('/learning-lab');
   await expect(page.getByRole('heading', { name: 'DotNet Learning Lab' })).toBeVisible();
   await expect(page.getByText('Practice mode ·', { exact: false })).toBeVisible();
-  await page.getByRole('button', { name: 'Start learning session' }).click();
-  for (let i = 0; i < 4; i++) {
+  const module = page.locator('.lab-module').first();
+  await expect(module.getByRole('heading', { name: 'Value Types, Reference Types and Boxing' })).toBeVisible();
+  await module.getByRole('button', { name: 'Start learning session' }).click();
+  const correctAnswers = ['A reference to the same object', '1', 'The struct is copied into a new heap object; the box still holds 1', 'It prints 1 because list.Add boxed a copy', 'The reference is passed by value'];
+  for (let i = 0; i < maxSessionQuestions; i++) {
     if (await page.getByLabel('Your explanation').count()) {
-      await page.getByLabel('Your explanation').fill('Class assignment copies the reference, while a struct copies its value.');
+      await page.getByLabel('Your explanation').fill('Class assignment copies the reference, while a struct copies its value; boxing copies a value type into a heap object.');
       await page.getByRole('button', { name: 'Compare with reference' }).click();
       await expect(page.getByRole('heading', { name: 'Compare your reasoning' })).toBeVisible();
       await page.getByRole('checkbox').first().check();
@@ -17,20 +22,21 @@ test('Lab grades a session, preserves Markdown evidence, and handles unconfigure
       await page.getByLabel('Your follow-up').fill('Why does parameter reassignment not replace the caller variable?');
       await page.getByRole('button', { name: 'Ask mentor' }).click();
       await expect(page.getByText('Practice guide:', { exact: false })).toBeVisible();
-      await page.getByRole('button', { name: i === 3 ? 'Finish session' : 'Next question' }).click();
     } else {
-      for (const answer of ['A reference to the same object', '1', 'The reference is passed by value']) {
+      for (const answer of correctAnswers) {
         const radio = page.getByRole('radio', { name: answer, exact: true });
         if (await radio.count()) { await radio.check(); break; }
       }
       await page.getByRole('button', { name: 'Review my answer' }).click();
       await expect(page.getByRole('heading', { name: '100/100 · Answer-key assessment' })).toBeVisible();
-      await page.getByRole('button', { name: i === 3 ? 'Finish session' : 'Next question' }).click();
     }
+    const finish = page.getByRole('button', { name: 'Finish session' });
+    if (await finish.count()) { await finish.click(); break; }
+    await page.getByRole('button', { name: 'Next question →' }).click();
   }
-  await expect(page.getByText('4/4', { exact: true })).toBeVisible();
+  await expect(module.getByText('6/6 concepts', { exact: false })).toBeVisible();
   await page.reload();
-  await expect(page.getByText('4/4', { exact: true })).toBeVisible();
+  await expect(page.locator('.lab-module').first().getByText('6/6 concepts', { exact: false })).toBeVisible();
   const markdown = await request.get('/api/lab/progress.md');
   expect(markdown.ok()).toBeTruthy();
   expect(await markdown.text()).toContain('Score: 100/100 (answer-key)');
@@ -85,4 +91,17 @@ test('adaptive sessions explain their focus, handle generation failures, and res
   await page.getByRole('button', { name: 'Resume adaptive session' }).click();
   await expect(page.getByRole('heading', { name: 'Unseen aliasing scenario 2' })).toBeVisible();
   expect(generationCalls).toBe(2);
+});
+
+test('lesson offers a prefilled ChatGPT visual-guide link', async ({ page }) => {
+  test.skip(!process.env.LAB_E2E, 'Requires the local ASP.NET learning server.');
+  await page.goto('/learning-lab');
+  await page.locator('.lab-module').first().getByRole('button', { name: 'Open lesson' }).click();
+  const href = await page.getByRole('link', { name: /Open a visual guide in ChatGPT/ }).getAttribute('href');
+  expect(href).toContain('https://chatgpt.com/?q=');
+  const prompt = new URL(href!).searchParams.get('q') ?? '';
+  expect(prompt).toContain('visual guide');
+  expect(prompt).toContain('Value Types, Reference Types and Boxing');
+  expect(prompt).toContain('CLR via C#, 4th Edition');
+  expect(await page.getByRole('button', { name: /Copy visual-guide prompt/ }).count()).toBe(1);
 });

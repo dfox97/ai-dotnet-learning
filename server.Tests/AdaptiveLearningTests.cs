@@ -73,6 +73,43 @@ public class AdaptiveLearningTests {
         }
     }
 
+    [Fact] public void Track_exposes_eight_modules_with_verified_content_and_docs() {
+        Assert.Equal(8, Curriculum.Modules.Length);
+        Assert.Equal(8, Curriculum.Modules.Select(m => m.Id).Distinct().Count());
+        foreach (var module in Curriculum.Modules) {
+            Assert.False(string.IsNullOrWhiteSpace(module.Title));
+            Assert.False(string.IsNullOrWhiteSpace(module.Summary));
+            Assert.False(string.IsNullOrWhiteSpace(module.Outcome));
+            Assert.False(string.IsNullOrWhiteSpace(module.TsComparison));
+            Assert.Contains("CLR via C#, 4th Edition", module.BookReference);
+            Assert.StartsWith("https://www.oreilly.com/library/view/clr-via-c/", Curriculum.BookUrl(module.Id));
+            Assert.NotEmpty(module.Docs);
+            Assert.All(module.Docs, doc => Assert.StartsWith("https://learn.microsoft.com/", doc.Url));
+            Assert.All(module.Sections, section => Assert.False(string.IsNullOrWhiteSpace(section.Code)));
+            Assert.True(module.Minutes is >= 15 and <= 30);
+            Assert.True(module.Sections.Sum( s => s.Minutes) >= 15);
+            Assert.False(string.IsNullOrWhiteSpace(module.AppliesToday));
+            Assert.False(string.IsNullOrWhiteSpace(module.Historical));
+            Assert.False(string.IsNullOrWhiteSpace(module.Checkpoint));
+            Assert.Contains(module.Questions, q => q.Kind == "prediction");
+            Assert.Contains(module.Questions, q => q.Kind == "bug");
+            Assert.Contains(module.Questions, q => q.Kind == "explanation");
+            Assert.Contains(module.Questions, q => q.Kind == "multiple-choice");
+            Assert.Equal(module.Questions.Length, module.Questions.Select(q => q.Id).Distinct().Count());
+            Assert.All(module.Questions, q => Assert.False(string.IsNullOrWhiteSpace(q.Explanation)));
+        }
+        Assert.Contains(Curriculum.Modules, m => m.Id == "value-types" && m.Questions.Any(q => q.Id == "boxing"));
+    }
+
+    [Fact] public void Plan_stays_at_four_targets_for_modules_with_more_than_four_concepts() {
+        var module = Curriculum.Find("value-types");
+        Assert.True(module.Questions.Length > 4);
+        var plan = AdaptiveLearning.Plan(module.Questions, [], Now);
+        Assert.Equal(4, plan.Length);
+        Assert.All(plan, target => Assert.Contains(module.Questions, q => q.Id == target.ConceptId));
+        Assert.Equal(new[] { "multiple-choice", "prediction", "bug", "explanation" }, plan.Select(p => p.Kind));
+    }
+
     [Fact] public async Task Api_generates_grades_resumes_after_restart_and_uses_new_evidence_for_next_batch() {
         var directory = Path.Combine(Path.GetTempPath(), "lab-test-" + Guid.NewGuid().ToString("N"));
         var oldDirectory = Environment.GetEnvironmentVariable("LAB_PROGRESS_DIR");
@@ -83,16 +120,17 @@ public class AdaptiveLearningTests {
             var provider = new FakeProvider();
             string sessionId;
             Question[] generated;
+            var module = Curriculum.Modules[0];
             using (var factory = new LabFactory(provider)) {
                 var client = factory.CreateClient();
                 Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/lab/sessions", new { })).StatusCode);
-                foreach (var q in Curriculum.Questions) {
+                foreach (var q in module.Questions) {
                     if (q.Kind == "explanation") provider.Replies.Enqueue("{\"score\":70,\"feedback\":\"Explain parameter reassignment more carefully.\"}");
                     var graded = await client.PostAsJsonAsync("/api/lab/grade", new { questionId = q.Id, answer = q.Kind == "explanation" ? "The same reference is copied." : q.Answer });
                     Assert.Equal(HttpStatusCode.OK, graded.StatusCode);
                 }
                 var progress = (await client.GetFromJsonAsync<Attempt[]>("/api/lab/progress"))!;
-                var plan = AdaptiveLearning.Plan(progress, DateTimeOffset.UtcNow);
+                var plan = AdaptiveLearning.Plan(module.Questions, progress, DateTimeOffset.UtcNow);
                 var batch = Batch(plan);
                 provider.Replies.Enqueue(JsonSerializer.Serialize(batch, json));
                 var response = await client.PostAsJsonAsync("/api/lab/sessions", new { });
@@ -119,7 +157,7 @@ public class AdaptiveLearningTests {
                     Assert.Equal(q.ConceptId, attempt!.ConceptId);
                 }
                 var progress = (await client.GetFromJsonAsync<Attempt[]>("/api/lab/progress"))!;
-                var plan = AdaptiveLearning.Plan(progress, DateTimeOffset.UtcNow);
+                var plan = AdaptiveLearning.Plan(module.Questions, progress, DateTimeOffset.UtcNow);
                 // An invalid generation must not damage saved questions or progress.
                 provider.Replies.Enqueue("{\"questions\":[]}");
                 Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.PostAsJsonAsync("/api/lab/sessions", new { })).StatusCode);
@@ -130,7 +168,7 @@ public class AdaptiveLearningTests {
                 Assert.Contains("Still confuses reference reassignment", provider.Requests.Last());
                 Assert.Equal(2, new AdaptiveCatalog(directory, json).Read().Length);
                 Assert.Contains("generated-", await client.GetStringAsync("/api/lab/progress.md"));
-                Assert.Equal(8, (await client.GetFromJsonAsync<Attempt[]>("/api/lab/progress"))!.Length);
+                Assert.Equal(module.Questions.Length + 4, (await client.GetFromJsonAsync<Attempt[]>("/api/lab/progress"))!.Length);
             }
         } finally {
             Environment.SetEnvironmentVariable("LAB_PROGRESS_DIR", oldDirectory);
